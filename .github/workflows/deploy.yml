@@ -78,10 +78,11 @@ jobs:
           VPS_USER: ${{ secrets.VPS_USER }}
           VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
 
+      # 600 = seul le runner lit le fichier ; l’image Docker scp/ssh tourne sous un autre UID → permission denied.
       - name: Write SSH key for deploy actions
         run: |
-          install -m 600 /dev/null "$GITHUB_WORKSPACE/.deploy_ssh_key"
           printf '%s\n' "$VPS_SSH_KEY" > "$GITHUB_WORKSPACE/.deploy_ssh_key"
+          chmod 644 "$GITHUB_WORKSPACE/.deploy_ssh_key"
         env:
           VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
 
