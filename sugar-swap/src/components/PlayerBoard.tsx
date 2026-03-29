@@ -85,7 +85,7 @@ export default function PlayerBoard({
 
       {/* Grid */}
       <div
-        className={`p-3 rounded-2xl relative ${isActive ? 'active-player-glow' : ''}`}
+        className={`p-2 sm:p-3 rounded-2xl relative ${isActive ? 'active-player-glow' : ''}`}
         style={{
           background: isActive
             ? 'rgba(255,255,255,0.25)'

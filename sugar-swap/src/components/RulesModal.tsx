@@ -201,7 +201,7 @@ export default function RulesModal({ isOpen, onClose }: Props) {
                 boxShadow:
                   '0 0 0 2px #C9A227, 0 0 32px rgba(255,215,0,0.45), 0 20px 60px rgba(0,0,0,0.35)',
                 position: 'relative',
-                padding: '28px 24px 24px',
+                padding: 'clamp(14px, 4vw, 28px) clamp(12px, 4vw, 24px)',
               }}
             >
               {/* Sugar texture overlay */}

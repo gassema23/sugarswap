@@ -33,9 +33,9 @@ type AppMode = 'menu' | 'vs_ai_setup' | 'vs_ai' | 'vs_human';
 function useCardSizes() {
   const get = () => {
     const w = window.innerWidth;
-    if (w < 400) return { ai: 36, human: 42, me: 44 };
-    if (w < 640) return { ai: 42, human: 50, me: 52 };
-    return { ai: 60, human: 68, me: 68 };
+    if (w < 400) return { ai: 34, human: 40, me: 42, deck: 42, showAiLabel: false };
+    if (w < 640) return { ai: 40, human: 48, me: 50, deck: 50, showAiLabel: false };
+    return { ai: 60, human: 68, me: 68, deck: 68, showAiLabel: true };
   };
   const [sizes, setSizes] = useState(get);
   useEffect(() => {
@@ -118,7 +118,11 @@ function useSoundEffects(gameState: GameState | null) {
     // Phase change
     if (phase !== prevPhaseRef.current) {
       if (phase === 'round_end') {
-        message.includes('DOUBLÉ') ? setTimeout(playScoreDoubled, 600) : playRoundEnd();
+        if (message.includes('DOUBLÉ')) {
+          setTimeout(playScoreDoubled, 600);
+        } else {
+          playRoundEnd();
+        }
       }
       if (phase === 'game_over') {
         const winner = [...players].sort((a, b) => a.totalScore - b.totalScore)[0];
@@ -325,6 +329,7 @@ function GameView({
             turnPhase={gs.turnPhase}
             gamePhase={gs.phase}
             cardSize={sizes.ai}
+            showLabel={sizes.showAiLabel}
           />
         )}
         <DeckDiscard
@@ -337,6 +342,7 @@ function GameView({
           onDrawDiscard={onDrawDiscard}
           onDrawDeck={onDrawDeck}
           onDiscardDrawn={onDiscardCard}
+          cardSize={sizes.deck}
         />
         {humanPlayer && (
           <PlayerBoard
@@ -562,6 +568,7 @@ function VsHumanGame({ onBackToMenu }: { onBackToMenu: () => void }) {
         onDrawDiscard={() => { playDrawDiscard(); drawDiscard(); }}
         onDrawDeck={() => { playDrawDeck(); drawDeck(); }}
         onDiscardDrawn={() => { playDiscard(); discardCard(); }}
+        cardSize={sizes.deck}
       />
 
       {/* My board only — label suppressed, already shown in OnlinePlayersBar */}
@@ -593,7 +600,7 @@ export default function App() {
   }
 
   return (
-    <div className="h-screen overflow-hidden flex flex-col items-center justify-center relative" style={{ fontFamily: 'var(--font-game)' }}>
+    <div className="flex flex-col items-center justify-center relative" style={{ fontFamily: 'var(--font-game)', minHeight: '100dvh', overflowX: 'hidden', overflowY: 'auto' }}>
       <Background />
 
       <RulesModal isOpen={showRules} onClose={() => setShowRules(false)} />

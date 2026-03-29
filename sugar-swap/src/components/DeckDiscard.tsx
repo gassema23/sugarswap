@@ -12,21 +12,18 @@ interface DeckDiscardProps {
   onDrawDiscard: () => void;
   onDrawDeck: () => void;
   onDiscardDrawn: () => void;
+  cardSize?: number;
 }
 
-function StackedDecks({ count }: { count: number }) {
+function StackedDecks({ count, cardSize }: { count: number; cardSize: number }) {
+  const h = Math.round(cardSize * 1.35);
   return (
-    <div className="relative" style={{ width: 68, height: 92 }}>
-      {/* stack shadow layers */}
+    <div className="relative" style={{ width: cardSize, height: h }}>
       {[3, 2, 1].map(i => (
         <div
           key={i}
           className="absolute card-back"
-          style={{
-            width: 68, height: 92,
-            top: -i * 2, left: i * 2,
-            opacity: 0.6,
-          }}
+          style={{ width: cardSize, height: h, top: -i * 2, left: i * 2, opacity: 0.6 }}
         />
       ))}
       <div className="absolute card-back w-full h-full" />
@@ -34,7 +31,7 @@ function StackedDecks({ count }: { count: number }) {
         className="absolute inset-0 flex items-center justify-center"
         style={{
           fontFamily: 'var(--font-game)',
-          fontSize: '1rem',
+          fontSize: cardSize < 50 ? '0.75rem' : '1rem',
           fontWeight: 700,
           color: 'white',
           textShadow: '0 1px 3px rgba(0,0,0,0.5)',
@@ -56,13 +53,18 @@ export default function DeckDiscard({
   onDrawDiscard,
   onDrawDeck,
   onDiscardDrawn,
+  cardSize = 68,
 }: DeckDiscardProps) {
+  const h       = Math.round(cardSize * 1.35);
+  const fontSize = cardSize < 50 ? '1.4rem' : '2rem';
+  const labelSize = cardSize < 50 ? '0.7rem' : '0.875rem';
+
   return (
-    <div className="flex flex-row items-end gap-y-4 gap-x-8">
+    <div className="flex flex-row items-end gap-y-4 gap-x-4 sm:gap-x-8">
 
       {/* Draw pile */}
       <div className="flex flex-col items-center gap-2">
-        <span className="text-white/70 text-sm font-bold" style={{ fontFamily: 'var(--font-game)' }}>
+        <span className="text-white/70 font-bold" style={{ fontFamily: 'var(--font-game)', fontSize: labelSize }}>
           Pioche ({deckCount})
         </span>
         <motion.div
@@ -71,7 +73,7 @@ export default function DeckDiscard({
           whileTap={canDrawDeck ? { scale: 0.95 } : {}}
           onClick={canDrawDeck ? onDrawDeck : undefined}
         >
-          <StackedDecks count={deckCount} />
+          <StackedDecks count={deckCount} cardSize={cardSize} />
           {canDrawDeck && (
             <motion.div
               className="absolute -inset-1 rounded-xl pointer-events-none"
@@ -85,11 +87,11 @@ export default function DeckDiscard({
       {/* Drawn card (in hand) */}
       {drawnCard && (
         <div className="flex flex-col items-center gap-2">
-          <span className="text-yellow-300 text-sm font-bold" style={{ fontFamily: 'var(--font-game)' }}>
+          <span className="text-yellow-300 font-bold" style={{ fontFamily: 'var(--font-game)', fontSize: labelSize }}>
             En main
           </span>
           <motion.div
-            style={{ width: 68, height: 92 }}
+            style={{ width: cardSize, height: h }}
             initial={{ scale: 0, rotate: -15 }}
             animate={{ scale: 1, rotate: 0 }}
             className="relative"
@@ -99,7 +101,7 @@ export default function DeckDiscard({
               style={{ background: cardColor(drawnCard.value) }}
             >
               <div className="absolute inset-0" style={{ background: 'radial-gradient(ellipse at 30% 25%, rgba(255,255,255,0.4) 0%, transparent 60%)' }} />
-              <div className="absolute inset-0 flex items-center justify-center" style={{ fontFamily: 'var(--font-game)', fontSize: '2rem', fontWeight: 900, color: cardTextColor(drawnCard.value), textShadow: '0 2px 0 rgba(0,0,0,0.3)' }}>
+              <div className="absolute inset-0 flex items-center justify-center" style={{ fontFamily: 'var(--font-game)', fontSize, fontWeight: 900, color: cardTextColor(drawnCard.value), textShadow: '0 2px 0 rgba(0,0,0,0.3)' }}>
                 {drawnCard.value}
               </div>
               <div className="absolute inset-0 pointer-events-none rounded-xl" style={{ background: 'linear-gradient(145deg, rgba(255,255,255,0.55) 0%, rgba(255,255,255,0.12) 45%, transparent 70%)' }} />
@@ -112,8 +114,8 @@ export default function DeckDiscard({
           </motion.div>
           {canDiscardDrawn && (
             <button
-              className="btn-candy text-sm"
-              style={{ background: 'linear-gradient(135deg, #FF5722, #E91E63)' }}
+              className="btn-candy"
+              style={{ background: 'linear-gradient(135deg, #FF5722, #E91E63)', fontSize: cardSize < 50 ? '0.7rem' : '0.875rem', padding: cardSize < 50 ? '0.25rem 0.7rem' : '0.4rem 1rem' }}
               onClick={onDiscardDrawn}
             >
               Défausser
@@ -124,12 +126,12 @@ export default function DeckDiscard({
 
       {/* Discard pile */}
       <div className="flex flex-col items-center gap-2">
-        <span className="text-white/70 text-sm font-bold" style={{ fontFamily: 'var(--font-game)' }}>
+        <span className="text-white/70 font-bold" style={{ fontFamily: 'var(--font-game)', fontSize: labelSize }}>
           Défausse
         </span>
         <motion.div
           className={`relative ${canDrawDiscard ? 'cursor-pointer' : 'opacity-70'}`}
-          style={{ width: 68, height: 92 }}
+          style={{ width: cardSize, height: h }}
           whileHover={canDrawDiscard ? { scale: 1.1, y: -5 } : {}}
           whileTap={canDrawDiscard ? { scale: 0.95 } : {}}
           onClick={canDrawDiscard ? onDrawDiscard : undefined}
@@ -143,7 +145,7 @@ export default function DeckDiscard({
                 <div className="absolute inset-0" style={{ background: 'radial-gradient(ellipse at 30% 25%, rgba(255,255,255,0.4) 0%, transparent 60%)' }} />
                 <div
                   className="absolute inset-0 flex items-center justify-center"
-                  style={{ fontFamily: 'var(--font-game)', fontSize: '2rem', fontWeight: 900, color: cardTextColor(topDiscard.value), textShadow: '0 2px 0 rgba(0,0,0,0.3)' }}
+                  style={{ fontFamily: 'var(--font-game)', fontSize, fontWeight: 900, color: cardTextColor(topDiscard.value), textShadow: '0 2px 0 rgba(0,0,0,0.3)' }}
                 >
                   {topDiscard.value}
                 </div>
@@ -158,7 +160,7 @@ export default function DeckDiscard({
               )}
             </>
           ) : (
-            <div className="w-full h-full rounded-xl border-2 border-dashed border-white/30 flex items-center justify-center text-white/40 text-sm">
+            <div className="w-full h-full rounded-xl border-2 border-dashed border-white/30 flex items-center justify-center text-white/40" style={{ fontSize: labelSize }}>
               vide
             </div>
           )}
@@ -168,4 +170,3 @@ export default function DeckDiscard({
     </div>
   );
 }
-
