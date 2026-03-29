@@ -57,6 +57,8 @@ jobs:
     name: Deploy to VPS
     runs-on: ubuntu-latest
     needs: build-and-push
+    # Sans ça, les secrets de l’environnement « Prod » ne sont pas disponibles (restent vides).
+    environment: Prod
 
     steps:
       - name: Checkout (for docker-compose + Caddyfile)
@@ -67,9 +69,9 @@ jobs:
       - name: Check deploy secrets
         run: |
           ok=1
-          [ -n "$VPS_HOST" ] || { echo "::error::Secret VPS_HOST vide — Settings → Secrets and variables → Actions"; ok=0; }
+          [ -n "$VPS_HOST" ] || { echo "::error::Secret VPS_HOST vide — vérifie l’environnement « Prod » ou les secrets du dépôt"; ok=0; }
           [ -n "$VPS_USER" ] || { echo "::error::Secret VPS_USER vide"; ok=0; }
-          [ -n "$VPS_SSH_KEY" ] || { echo "::error::Secret VPS_SSH_KEY vide — vérifie le nom exact et le dépôt GitHub (ex. gassema23/sugarswap)"; ok=0; }
+          [ -n "$VPS_SSH_KEY" ] || { echo "::error::Secret VPS_SSH_KEY vide — nom exact VPS_SSH_KEY dans l’environnement Prod"; ok=0; }
           [ "$ok" = 1 ] || exit 1
         env:
           VPS_HOST: ${{ secrets.VPS_HOST }}
