@@ -1,11 +1,11 @@
 /**
- * useOnlineGame — wraps useGame + WebSocket sync for 2-player online mode.
+ * useOnlineGame — wraps useGame + WebSocket sync for 2–4 player online mode.
  *
  * Protocol:
- *  • Host (playerIndex=0) calls initGame → sends initial state to server → relay to opponent.
+ *  • Host (playerIndex=0) creates room → others join → host starts game.
  *  • After EVERY local action, the acting client sends the new state to the server.
- *  • The server relays it to the other client.
- *  • The receiving client calls setState() to replace its local state.
+ *  • The server relays it to all other clients in the room.
+ *  • Each receiving client calls setState() to replace its local state.
  *  • isHuman flags are re-mapped on receipt so each client sees itself as "human".
  */
 
@@ -22,19 +22,21 @@ const WS_URL = (import.meta as { env: Record<string, string> }).env.VITE_WS_URL
 export type OnlineStatus =
   | 'idle'
   | 'connecting'
-  | 'waiting'       // room created, waiting for opponent
-  | 'ready'         // opponent joined, host about to start game
+  | 'waiting'              // room created, waiting for more players
+  | 'ready'                // all slots filled → host about to start
   | 'playing'
-  | 'opponent_disconnected'
+  | 'player_disconnected'
+  | 'opponent_disconnected' // alias kept for legacy display
   | 'error';
 
 type ServerMsg =
-  | { type: 'room_created';          code: string; playerIndex: 0 }
-  | { type: 'room_joined';           code: string; playerIndex: 1; opponentName: string }
-  | { type: 'opponent_joined';       opponentName: string }
-  | { type: 'state_update';          state: GameState }
+  | { type: 'room_created';        code: string; playerIndex: 0; maxPlayers: number }
+  | { type: 'room_joined';         code: string; playerIndex: number; players: string[]; maxPlayers: number }
+  | { type: 'player_joined';       players: string[]; newPlayerName: string; newPlayerIndex: number }
+  | { type: 'state_update';        state: GameState }
+  | { type: 'player_disconnected'; playerIndex: number }
   | { type: 'opponent_disconnected' }
-  | { type: 'error';                 message: string }
+  | { type: 'error';               message: string }
   | { type: 'pong' };
 
 // ─── Helper: remap isHuman flags for the local player's perspective ───────────
@@ -58,16 +60,20 @@ export function useOnlineGame() {
     newRound: _newRound,
   } = useGame();
 
-  const [status, setStatus]           = useState<OnlineStatus>('idle');
-  const [roomCode, setRoomCode]       = useState<string | null>(null);
+  const [status, setStatus]         = useState<OnlineStatus>('idle');
+  const [roomCode, setRoomCode]     = useState<string | null>(null);
   const [playerIndex, setPlayerIndex] = useState<number | null>(null);
-  const [opponentName, setOpponentName] = useState<string | null>(null);
-  const [errorMsg, setErrorMsg]       = useState<string | null>(null);
-  const [myName, setMyName]           = useState('');
+  const [players, setPlayers]       = useState<string[]>([]);   // all player names
+  const [maxPlayers, setMaxPlayers] = useState<number>(2);
+  const [errorMsg, setErrorMsg]     = useState<string | null>(null);
+  const [myName, setMyName]         = useState('');
 
-  const wsRef      = useRef<WebSocket | null>(null);
-  const myIdxRef   = useRef<number | null>(null);   // stable ref for callbacks
-  const codeRef    = useRef<string | null>(null);
+  const wsRef          = useRef<WebSocket | null>(null);
+  const myIdxRef       = useRef<number | null>(null);  // stable ref for callbacks
+  const codeRef        = useRef<string | null>(null);
+  const maxPlayersRef  = useRef<number>(2);
+  const statusRef      = useRef<OnlineStatus>('idle');
+  statusRef.current    = status;
 
   // ── Send helper ─────────────────────────────────────────────────────────────
   const wsSend = useCallback((msg: object) => {
@@ -106,34 +112,45 @@ export function useOnlineGame() {
         if (msg.type === 'pong') return;
 
         if (msg.type === 'room_created') {
-          myIdxRef.current = 0;
-          codeRef.current  = msg.code;
+          myIdxRef.current     = 0;
+          codeRef.current      = msg.code;
+          maxPlayersRef.current = msg.maxPlayers;
           setPlayerIndex(0);
           setRoomCode(msg.code);
+          setMaxPlayers(msg.maxPlayers);
+          setPlayers([myName]);  // host is player 0
           setStatus('waiting');
         }
 
         if (msg.type === 'room_joined') {
-          myIdxRef.current = 1;
-          codeRef.current  = msg.code;
-          setPlayerIndex(1);
+          myIdxRef.current      = msg.playerIndex;
+          codeRef.current       = msg.code;
+          maxPlayersRef.current = msg.maxPlayers;
+          setPlayerIndex(msg.playerIndex);
           setRoomCode(msg.code);
-          setOpponentName(msg.opponentName);
-          setStatus('playing');
+          setMaxPlayers(msg.maxPlayers);
+          setPlayers(msg.players);
+          // Non-host joiners wait in lobby until state_update arrives
+          setStatus('waiting');
         }
 
-        if (msg.type === 'opponent_joined') {
-          setOpponentName(msg.opponentName);
-          setStatus('ready'); // host will start the game
+        if (msg.type === 'player_joined') {
+          setPlayers(msg.players);
+          // Auto-start when room is full (host only)
+          if (myIdxRef.current === 0 && msg.players.length === maxPlayersRef.current) {
+            setStatus('ready');
+          }
         }
 
         if (msg.type === 'state_update') {
           const myIdx = myIdxRef.current ?? 0;
           setState(remapIsHuman(msg.state, myIdx));
+          // Transition all non-playing clients (joiners waiting for host to start)
+          if (statusRef.current !== 'playing') setStatus('playing');
         }
 
-        if (msg.type === 'opponent_disconnected') {
-          setStatus('opponent_disconnected');
+        if (msg.type === 'player_disconnected' || msg.type === 'opponent_disconnected') {
+          setStatus('player_disconnected');
         }
 
         if (msg.type === 'error') {
@@ -143,34 +160,33 @@ export function useOnlineGame() {
       };
 
       ws.onclose = () => {
-        if (status === 'playing') setStatus('opponent_disconnected');
+        if (statusRef.current === 'playing') setStatus('player_disconnected');
       };
     });
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [myName, setState]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Host: opponent just joined → auto-start game ──────────────────────────
+  // ── Host: all players joined → auto-start game ────────────────────────────
   useEffect(() => {
-    if (status !== 'ready' || myIdxRef.current !== 0 || !opponentName) return;
-    // Small delay so the "opponent joined" UI flashes briefly
+    if (status !== 'ready' || myIdxRef.current !== 0) return;
     const t = setTimeout(() => {
-      const names = [myName, opponentName];
-      const state = initGame(names);
+      const state  = initGame(players);
       const mapped = remapIsHuman(state, 0);
       setState(mapped);
       broadcastState(mapped);
       setStatus('playing');
     }, 1200);
     return () => clearTimeout(t);
-  }, [status, opponentName, myName, setState, broadcastState]);
+  }, [status, players, setState, broadcastState]);
 
-  // ── Public actions — each applies locally then broadcasts ─────────────────
+  // ── Public actions ────────────────────────────────────────────────────────
 
-  const createRoom = useCallback(async (name: string) => {
+  const createRoom = useCallback(async (name: string, max: number = 2) => {
     setMyName(name);
     setErrorMsg(null);
+    maxPlayersRef.current = max;
     try {
       await connect();
-      wsSend({ type: 'create_room', playerName: name });
+      wsSend({ type: 'create_room', playerName: name, maxPlayers: max });
     } catch { /* error already set */ }
   }, [connect, wsSend]);
 
@@ -183,14 +199,19 @@ export function useOnlineGame() {
     } catch { /* error already set */ }
   }, [connect, wsSend]);
 
-  // Wrap every game action: apply locally → broadcast
+  /** Host manually starts the game (when ≥ 2 players but room not yet full). */
+  const startOnlineGame = useCallback(() => {
+    if (myIdxRef.current !== 0) return;
+    setStatus('ready');
+  }, []);
+
+  // ── Wrap every game action: apply locally → broadcast ────────────────────
   function wrap<T extends unknown[]>(
     fn: (...args: T) => void,
     getState: () => GameState | null,
   ) {
     return (...args: T) => {
       fn(...args);
-      // State update is async (React batching), so defer broadcast
       setTimeout(() => {
         const s = getState();
         if (s) broadcastState(s);
@@ -198,7 +219,6 @@ export function useOnlineGame() {
     };
   }
 
-  // We need the latest gameState in the broadcast — use a ref trick
   const gsRef = useRef<GameState | null>(gameState);
   gsRef.current = gameState;
   const getGs = () => gsRef.current;
@@ -238,19 +258,28 @@ export function useOnlineGame() {
     setStatus('idle');
     setRoomCode(null);
     setPlayerIndex(null);
-    setOpponentName(null);
+    setPlayers([]);
+    setMaxPlayers(2);
     setErrorMsg(null);
   }, []);
+
+  // Backward-compat: first opponent name for simple 2-player displays
+  const opponentName = players.find((_, i) => i !== (myIdxRef.current ?? 0)) ?? null;
+
+  void _start; // unused in online mode
 
   return {
     gameState,
     status,
     roomCode,
     playerIndex,
+    players,
+    maxPlayers,
     opponentName,
     errorMsg,
     createRoom,
     joinRoom,
+    startOnlineGame,
     initialReveal,
     drawDiscard,
     drawDeck,

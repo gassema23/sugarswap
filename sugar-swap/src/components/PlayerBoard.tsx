@@ -12,6 +12,7 @@ interface PlayerBoardProps {
   gamePhase: string;
   onCardClick?: (row: number, col: number) => void;
   cardSize?: number;
+  showLabel?: boolean;
 }
 
 // ─── Column Elimination Confetti ──────────────────────────────────────────────
@@ -28,6 +29,7 @@ export default function PlayerBoard({
   gamePhase,
   onCardClick,
   cardSize = 68,
+  showLabel = true,
 }: PlayerBoardProps) {
   // A card is clickable for a human player depending on phase
   function isCardClickable(row: number, col: number): boolean {
@@ -50,7 +52,7 @@ export default function PlayerBoard({
   return (
     <div className="flex flex-col items-center gap-2">
       {/* Player label */}
-      <motion.div
+      {showLabel && <motion.div
         className="flex items-center gap-2 px-4 py-1 rounded-full text-white font-bold"
         style={{
           background: isActive
@@ -79,7 +81,7 @@ export default function PlayerBoard({
         >
           {score} pts
         </span>
-      </motion.div>
+      </motion.div>}
 
       {/* Grid */}
       <div

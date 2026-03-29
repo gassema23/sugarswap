@@ -103,6 +103,7 @@ export default function ScoreBoard({
           </motion.div>
         )}
       </AnimatePresence>
+
     </motion.div>
   );
 }

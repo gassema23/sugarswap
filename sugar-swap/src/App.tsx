@@ -24,7 +24,7 @@ import {
   playDefeat,
   playGameStart,
 } from './utils/sounds';
-import type { GameState } from './engine/types';
+import type { GameState, GamePhase, Player } from './engine/types';
 
 // ─── App mode ─────────────────────────────────────────────────────────────────
 type AppMode = 'menu' | 'vs_ai_setup' | 'vs_ai' | 'vs_human';
@@ -105,7 +105,7 @@ function ModeMenu({ onSelect, onRules }: { onSelect: (m: AppMode) => void; onRul
           style={{ background: 'linear-gradient(135deg,#9C27B0,#03A9F4)', fontSize: '1rem' }}
           onClick={() => { playButtonClick(); onSelect('vs_human'); }}
         >
-          🌐 En ligne (2 joueurs)
+          🌐 En ligne (2–8 joueurs)
         </button>
 
         <button
@@ -367,28 +367,87 @@ function VsAiGame({ names, onBackToMenu }: { names: string[]; onBackToMenu: () =
   );
 }
 
+// ─── Compact players status bar (online multi-player) ────────────────────────
+function OnlinePlayersBar({
+  players,
+  currentPlayerIndex,
+  gamePhase,
+}: {
+  players: Player[];
+  currentPlayerIndex: number;
+  gamePhase: GamePhase;
+}) {
+  const isActive = (i: number) =>
+    i === currentPlayerIndex && gamePhase !== 'round_end' && gamePhase !== 'game_over';
+
+  return (
+    <div className="flex flex-wrap gap-2 justify-center w-full max-w-3xl">
+      {players.map((p, i) => {
+        const active  = isActive(i);
+        const visible = p.grid.flat()
+          .filter(c => c?.isRevealed)
+          .reduce((s, c) => s + (c?.value ?? 0), 0);
+
+        return (
+          <motion.div
+            key={p.id}
+            className="flex items-center gap-1.5 px-3 py-1 rounded-full"
+            animate={active ? { scale: [1, 1.04, 1] } : { scale: 1 }}
+            transition={active ? { duration: 1.2, repeat: Infinity } : {}}
+            style={{
+              background: active ? 'linear-gradient(135deg, #E91E63, #FF5722)' : 'rgba(0,0,0,0.30)',
+              border: active ? '2px solid #FFD700' : '2px solid rgba(255,255,255,0.12)',
+              backdropFilter: 'blur(8px)',
+              textShadow: active ? '0 1px 3px rgba(0,0,0,0.5)' : 'none',
+            }}
+          >
+            <span style={{ fontSize: '0.75rem' }}>{p.isHuman ? '⭐' : '👤'}</span>
+            <span style={{ color: active ? '#FFD700' : 'rgba(255,255,255,0.85)', fontSize: '0.8rem', fontFamily: 'var(--font-game)' }}>
+              {p.name}
+            </span>
+            <span
+              className="px-1.5 py-0.5 rounded-full text-xs font-bold"
+              style={{ background: 'rgba(0,0,0,0.35)', color: active ? '#FFD700' : 'rgba(255,255,255,0.5)' }}
+            >
+              {visible > 0 ? `+${visible}` : visible}
+            </span>
+          </motion.div>
+        );
+      })}
+    </div>
+  );
+}
+
 // ─── VS HUMAN (online) game controller ───────────────────────────────────────
 function VsHumanGame({ onBackToMenu }: { onBackToMenu: () => void }) {
   const {
-    gameState, status, roomCode, opponentName, errorMsg,
-    createRoom, joinRoom,
+    gameState, status, roomCode, players, maxPlayers, playerIndex, errorMsg,
+    createRoom, joinRoom, startOnlineGame,
     initialReveal, drawDiscard, drawDeck, discardCard,
     swapCard, revealCard, newRound, disconnect,
   } = useOnlineGame();
 
   useSoundEffects(gameState);
 
-  if (status === 'idle' || status === 'connecting' || status === 'waiting' ||
-      status === 'ready' || status === 'error' || status === 'opponent_disconnected') {
+  const isLobbyState = (
+    status === 'idle' || status === 'connecting' || status === 'waiting' ||
+    status === 'ready' || status === 'error' ||
+    status === 'player_disconnected' || status === 'opponent_disconnected'
+  );
+
+  if (isLobbyState) {
     return (
       <div className="flex items-center justify-center w-full">
         <OnlineLobby
           status={status}
           roomCode={roomCode}
-          opponentName={opponentName}
+          players={players}
+          maxPlayers={maxPlayers}
+          playerIndex={playerIndex}
           errorMsg={errorMsg}
           onCreateRoom={createRoom}
           onJoinRoom={joinRoom}
+          onStartGame={startOnlineGame}
           onBack={() => { disconnect(); onBackToMenu(); }}
         />
       </div>
@@ -396,8 +455,20 @@ function VsHumanGame({ onBackToMenu }: { onBackToMenu: () => void }) {
   }
 
   if (!gameState) return null;
-  const gs = gameState;
+  const gs          = gameState;
   const isHumanTurn = gs.players[gs.currentPlayerIndex].isHuman;
+  const mePlayer    = gs.players.find(p => p.isHuman);
+  const topDiscard  = gs.discardPile[gs.discardPile.length - 1] ?? null;
+
+  const canDrawDiscard =
+    isHumanTurn && gs.turnPhase === 'draw' &&
+    (gs.phase === 'playing' || gs.phase === 'last_round') &&
+    gs.discardPile.length > 0;
+  const canDrawDeck =
+    isHumanTurn && gs.turnPhase === 'draw' &&
+    (gs.phase === 'playing' || gs.phase === 'last_round');
+  const canDiscardDrawn =
+    isHumanTurn && gs.turnPhase === 'discard_or_swap' && !!gs.drawnCard;
 
   function handleCardClick(row: number, col: number) {
     const { phase, turnPhase, currentPlayerIndex } = gs;
@@ -407,16 +478,63 @@ function VsHumanGame({ onBackToMenu }: { onBackToMenu: () => void }) {
   }
 
   return (
-    <GameView
-      gameState={gs}
-      isHumanTurn={isHumanTurn}
-      onCardClick={handleCardClick}
-      onDrawDeck={() => { playDrawDeck(); drawDeck(); }}
-      onDrawDiscard={() => { playDrawDiscard(); drawDiscard(); }}
-      onDiscardCard={() => { playDiscard(); discardCard(); }}
-      onNewRound={() => { playButtonClick(); newRound(); }}
-      onNewGame={() => { playButtonClick(); disconnect(); onBackToMenu(); }}
-    />
+    <motion.div
+      key="online-game"
+      className="w-full flex flex-col items-center px-4 py-2 gap-2 relative z-10"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+    >
+      {/* Top bar */}
+      <div className="w-full max-w-6xl flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <Logo size="sm" />
+          <div
+            className="px-3 py-1 rounded-full text-sm font-bold"
+            style={{ background: 'rgba(0,0,0,0.3)', color: 'rgba(255,255,255,0.6)', backdropFilter: 'blur(6px)', border: '1px solid rgba(255,255,255,0.15)' }}
+          >
+            Manche {gs.roundNumber}
+          </div>
+        </div>
+        <GameMessage message={gs.message} />
+        <ScoreBoard
+          players={gs.players}
+          roundNumber={gs.roundNumber}
+          isGameOver={gs.phase === 'game_over'}
+          onNewRound={gs.phase === 'round_end' ? () => { playButtonClick(); newRound(); } : undefined}
+          onNewGame={gs.phase === 'game_over' ? () => { playButtonClick(); disconnect(); onBackToMenu(); } : undefined}
+        />
+      </div>
+
+      {/* Compact players status bar */}
+      <OnlinePlayersBar players={gs.players} currentPlayerIndex={gs.currentPlayerIndex} gamePhase={gs.phase} />
+
+      {/* Deck / Discard */}
+      <DeckDiscard
+        deckCount={gs.deck.length}
+        topDiscard={topDiscard}
+        drawnCard={gs.drawnCard}
+        canDrawDiscard={canDrawDiscard}
+        canDrawDeck={canDrawDeck}
+        canDiscardDrawn={canDiscardDrawn}
+        onDrawDiscard={() => { playDrawDiscard(); drawDiscard(); }}
+        onDrawDeck={() => { playDrawDeck(); drawDeck(); }}
+        onDiscardDrawn={() => { playDiscard(); discardCard(); }}
+      />
+
+      {/* My board only — label suppressed, already shown in OnlinePlayersBar */}
+      {mePlayer && (
+        <PlayerBoard
+          player={mePlayer}
+          isActive={isHumanTurn && gs.phase !== 'round_end' && gs.phase !== 'game_over'}
+          isHuman={true}
+          turnPhase={gs.turnPhase}
+          gamePhase={gs.phase}
+          onCardClick={handleCardClick}
+          cardSize={68}
+          showLabel={false}
+        />
+      )}
+    </motion.div>
   );
 }
 

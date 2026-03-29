@@ -4,13 +4,16 @@ import type { OnlineStatus } from '../hooks/useOnlineGame';
 import { playButtonClick } from '../utils/sounds';
 
 interface Props {
-  status: OnlineStatus;
-  roomCode: string | null;
-  opponentName: string | null;
-  errorMsg: string | null;
-  onCreateRoom: (name: string) => void;
-  onJoinRoom:   (code: string, name: string) => void;
-  onBack: () => void;
+  status:          OnlineStatus;
+  roomCode:        string | null;
+  players:         string[];         // all connected players (including self)
+  maxPlayers:      number;
+  playerIndex:     number | null;    // local player's index (0 = host)
+  errorMsg:        string | null;
+  onCreateRoom:    (name: string, maxPlayers: number) => void;
+  onJoinRoom:      (code: string, name: string) => void;
+  onStartGame:     () => void;       // host early-start (when ≥ 2, room not full)
+  onBack:          () => void;
 }
 
 const inputStyle: React.CSSProperties = {
@@ -29,20 +32,27 @@ const inputStyle: React.CSSProperties = {
 export default function OnlineLobby({
   status,
   roomCode,
-  opponentName,
+  players,
+  maxPlayers,
+  playerIndex,
   errorMsg,
   onCreateRoom,
   onJoinRoom,
+  onStartGame,
   onBack,
 }: Props) {
-  const [name, setName]   = useState('');
-  const [code, setCode]   = useState('');
-  const [tab, setTab]     = useState<'create' | 'join'>('create');
+  const [name, setName]           = useState('');
+  const [code, setCode]           = useState('');
+  const [tab, setTab]             = useState<'create' | 'join'>('create');
+  const [selectedMax, setSelectedMax] = useState(2);
+
+  const isHost     = playerIndex === 0;
+  const canStart   = isHost && players.length >= 2;
 
   function handleCreate() {
     if (!name.trim()) return;
     playButtonClick();
-    onCreateRoom(name.trim());
+    onCreateRoom(name.trim(), selectedMax);
   }
 
   function handleJoin() {
@@ -51,43 +61,105 @@ export default function OnlineLobby({
     onJoinRoom(code.trim(), name.trim());
   }
 
-  // ── Waiting for opponent ─────────────────────────────────────────────────
+  // ── Waiting for players ──────────────────────────────────────────────────
   if (status === 'waiting') {
     return (
       <LobbyCard>
         <div className="text-3xl mb-1">⏳</div>
-        <h3 style={{ color: '#FFD700', margin: 0, fontSize: '1.2rem' }}>En attente d'un adversaire…</h3>
-        <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.85rem', margin: '4px 0 12px' }}>
-          Partage ce code à ton ami :
-        </p>
-        <div
-          className="px-5 py-2 rounded-2xl text-3xl font-bold tracking-widest select-all cursor-pointer"
-          style={{
-            background: 'rgba(255,215,0,0.15)',
-            border: '2px solid rgba(255,215,0,0.6)',
-            color: '#FFD700',
-            letterSpacing: '0.25em',
-          }}
-          onClick={() => navigator.clipboard?.writeText(roomCode ?? '')}
-          title="Cliquer pour copier"
-        >
-          {roomCode}
+        <h3 style={{ color: '#FFD700', margin: 0, fontSize: '1.2rem' }}>
+          {isHost ? 'En attente de joueurs…' : 'En attente de la partie…'}
+        </h3>
+
+        {/* Room code (only host shares it) */}
+        {isHost && (
+          <>
+            <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.85rem', margin: '4px 0 8px' }}>
+              Partage ce code à tes amis :
+            </p>
+            <div
+              className="px-5 py-2 rounded-2xl text-3xl font-bold tracking-widest select-all cursor-pointer"
+              style={{
+                background: 'rgba(255,215,0,0.15)',
+                border: '2px solid rgba(255,215,0,0.6)',
+                color: '#FFD700',
+                letterSpacing: '0.25em',
+              }}
+              onClick={() => navigator.clipboard?.writeText(roomCode ?? '')}
+              title="Cliquer pour copier"
+            >
+              {roomCode}
+            </div>
+            <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: '0.7rem', marginTop: 4 }}>
+              Cliquer pour copier
+            </p>
+          </>
+        )}
+
+        {/* Connected players list */}
+        <div className="w-full mt-2">
+          <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.72rem', marginBottom: 6, textAlign: 'center' }}>
+            Joueurs connectés ({players.length}/{maxPlayers})
+          </p>
+          <div className="flex flex-col gap-1">
+            {players.map((p, i) => (
+              <div
+                key={i}
+                className="flex items-center gap-2 px-3 py-1 rounded-xl"
+                style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)' }}
+              >
+                <span style={{ fontSize: '0.8rem' }}>{i === 0 ? '👑' : '👤'}</span>
+                <span style={{ color: i === playerIndex ? '#FFD700' : 'rgba(255,255,255,0.8)', fontSize: '0.85rem' }}>
+                  {p}{i === playerIndex ? ' (toi)' : ''}
+                </span>
+              </div>
+            ))}
+            {/* Empty slots */}
+            {Array.from({ length: maxPlayers - players.length }).map((_, i) => (
+              <div
+                key={`empty-${i}`}
+                className="flex items-center gap-2 px-3 py-1 rounded-xl"
+                style={{ background: 'rgba(255,255,255,0.04)', border: '1px dashed rgba(255,255,255,0.15)' }}
+              >
+                <span style={{ fontSize: '0.8rem' }}>⬜</span>
+                <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.85rem', fontStyle: 'italic' }}>
+                  En attente…
+                </span>
+              </div>
+            ))}
+          </div>
         </div>
-        <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: '0.7rem', marginTop: 6 }}>
-          Cliquer pour copier
-        </p>
-        <Spinner />
+
+        {/* Host early-start button */}
+        {canStart && players.length < maxPlayers && (
+          <button
+            className="btn-candy w-full mt-2"
+            style={{ background: 'linear-gradient(135deg,#4CAF50,#03A9F4)', fontSize: '0.9rem' }}
+            onClick={() => { playButtonClick(); onStartGame(); }}
+          >
+            🎮 Démarrer ({players.length} joueurs)
+          </button>
+        )}
+
+        {!canStart && <Spinner />}
+
+        <button
+          className="mt-2 text-sm"
+          style={{ color: 'rgba(255,255,255,0.4)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-game)' }}
+          onClick={() => { playButtonClick(); onBack(); }}
+        >
+          ← Retour
+        </button>
       </LobbyCard>
     );
   }
 
-  // ── Opponent joined → host starting game ─────────────────────────────────
+  // ── All players joined → host starting game ───────────────────────────────
   if (status === 'ready') {
     return (
       <LobbyCard>
         <div className="text-3xl mb-1">🎉</div>
         <h3 style={{ color: '#4CAF50', margin: 0, fontSize: '1.1rem' }}>
-          {opponentName} a rejoint !
+          Tous les joueurs sont prêts !
         </h3>
         <p style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.85rem', marginTop: 6 }}>
           La partie commence…
@@ -97,7 +169,7 @@ export default function OnlineLobby({
     );
   }
 
-  // ── Joiner connecting ─────────────────────────────────────────────────────
+  // ── Connecting ────────────────────────────────────────────────────────────
   if (status === 'connecting') {
     return (
       <LobbyCard>
@@ -108,12 +180,16 @@ export default function OnlineLobby({
   }
 
   // ── Disconnected ──────────────────────────────────────────────────────────
-  if (status === 'opponent_disconnected') {
+  if (status === 'player_disconnected' || status === 'opponent_disconnected') {
     return (
       <LobbyCard>
         <div className="text-3xl mb-1">🔌</div>
-        <h3 style={{ color: '#FF5722', margin: 0 }}>Adversaire déconnecté</h3>
-        <button className="btn-candy mt-4" style={{ background: 'linear-gradient(135deg,#E91E63,#FF9800)' }} onClick={onBack}>
+        <h3 style={{ color: '#FF5722', margin: 0 }}>Un joueur s'est déconnecté</h3>
+        <button
+          className="btn-candy mt-4"
+          style={{ background: 'linear-gradient(135deg,#E91E63,#FF9800)' }}
+          onClick={onBack}
+        >
           Retour au menu
         </button>
       </LobbyCard>
@@ -169,8 +245,31 @@ export default function OnlineLobby({
             exit={{ opacity: 0, x: 10 }}
             className="flex flex-col items-center gap-3 w-full"
           >
+            {/* Number of players */}
+            <div className="flex flex-col gap-1 w-full">
+              <label style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.75rem' }}>
+                Nombre de joueurs (2–8)
+              </label>
+              <select
+                value={selectedMax}
+                onChange={e => { setSelectedMax(Number(e.target.value)); playButtonClick(); }}
+                style={{
+                  ...inputStyle,
+                  cursor: 'pointer',
+                  appearance: 'none',
+                  WebkitAppearance: 'none',
+                }}
+              >
+                {[2, 3, 4, 5, 6, 7, 8].map(n => (
+                  <option key={n} value={n} style={{ background: '#1a1a2e', color: 'white' }}>
+                    {n} joueurs
+                  </option>
+                ))}
+              </select>
+            </div>
+
             <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.78rem', textAlign: 'center', margin: 0 }}>
-              Un code sera généré — partage-le à ton ami.
+              Un code sera généré — partage-le à tes amis.
             </p>
             <button
               className="btn-candy w-full"
@@ -246,7 +345,7 @@ function LobbyCard({ children }: { children: React.ReactNode }) {
         backdropFilter: 'blur(16px)',
         border: '2px solid rgba(255,215,0,0.3)',
         boxShadow: '0 8px 40px rgba(0,0,0,0.35)',
-        minWidth: 300,
+        minWidth: 310,
         fontFamily: 'var(--font-game)',
       }}
       initial={{ opacity: 0, scale: 0.88 }}

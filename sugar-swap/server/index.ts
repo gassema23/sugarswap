@@ -2,9 +2,8 @@
  * Sugar Swap — WebSocket relay server
  *
  * Responsibilities:
- *  • Create rooms with a 6-char code
- *  • Join up to 2 players per room
- *  • Relay state/action messages between the two players
+ *  • Create rooms with a 6-char code (2–4 players)
+ *  • Relay state/action messages between all players in a room
  *  • Clean up rooms on disconnect
  *
  * The server is intentionally game-logic-free:
@@ -26,20 +25,21 @@ const wss = new WebSocketServer({ server: httpServer });
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type ClientMsg =
-  | { type: 'create_room'; playerName: string }
+  | { type: 'create_room'; playerName: string; maxPlayers?: number }
   | { type: 'join_room';   roomCode: string; playerName: string }
   | { type: 'state_update'; roomCode: string; state: unknown }
   | { type: 'ping' };
 
 interface Room {
-  code:    string;
-  sockets: WebSocket[];
-  names:   string[];
+  code:       string;
+  sockets:    WebSocket[];
+  names:      string[];
+  maxPlayers: number;
 }
 
 // ─── State ────────────────────────────────────────────────────────────────────
 
-const rooms = new Map<string, Room>();
+const rooms      = new Map<string, Room>();
 const socketRoom = new WeakMap<WebSocket, string>(); // socket → roomCode
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -52,6 +52,7 @@ function send(ws: WebSocket, msg: object) {
   if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg));
 }
 
+/** Relay a message to every socket in the room except the sender. */
 function relay(room: Room, sender: WebSocket, msg: object) {
   for (const ws of room.sockets) {
     if (ws !== sender) send(ws, msg);
@@ -73,12 +74,13 @@ wss.on('connection', (ws) => {
       let code = genCode();
       while (rooms.has(code)) code = genCode();
 
-      const room: Room = { code, sockets: [ws], names: [msg.playerName] };
+      const maxPlayers = Math.min(Math.max(Number(msg.maxPlayers ?? 2), 2), 8);
+      const room: Room = { code, sockets: [ws], names: [msg.playerName], maxPlayers };
       rooms.set(code, room);
       socketRoom.set(ws, code);
 
-      send(ws, { type: 'room_created', code, playerIndex: 0 });
-      console.log(`[${code}] created by "${msg.playerName}"`);
+      send(ws, { type: 'room_created', code, playerIndex: 0, maxPlayers });
+      console.log(`[${code}] created by "${msg.playerName}" (max ${maxPlayers} players)`);
       return;
     }
 
@@ -89,25 +91,36 @@ wss.on('connection', (ws) => {
         send(ws, { type: 'error', message: 'Salon introuvable. Vérifie le code.' });
         return;
       }
-      if (room.sockets.length >= 2) {
+      if (room.sockets.length >= room.maxPlayers) {
         send(ws, { type: 'error', message: 'Ce salon est déjà plein.' });
         return;
       }
+
+      const newPlayerIndex = room.sockets.length;
       room.sockets.push(ws);
       room.names.push(msg.playerName);
       socketRoom.set(ws, msg.roomCode.toUpperCase());
 
-      // Tell joiner
+      // Tell the joiner: their index + all current player names
       send(ws, {
-        type: 'room_joined',
-        code: room.code,
-        playerIndex: 1,
-        opponentName: room.names[0],
+        type:        'room_joined',
+        code:        room.code,
+        playerIndex: newPlayerIndex,
+        players:     room.names,
+        maxPlayers:  room.maxPlayers,
       });
-      // Tell host
-      send(room.sockets[0], { type: 'opponent_joined', opponentName: msg.playerName });
 
-      console.log(`[${room.code}] "${msg.playerName}" joined "${room.names[0]}"`);
+      // Tell every existing player in the room
+      for (let i = 0; i < newPlayerIndex; i++) {
+        send(room.sockets[i], {
+          type:           'player_joined',
+          players:        room.names,
+          newPlayerName:  msg.playerName,
+          newPlayerIndex,
+        });
+      }
+
+      console.log(`[${room.code}] "${msg.playerName}" joined (${room.sockets.length}/${room.maxPlayers})`);
       return;
     }
 
@@ -125,8 +138,9 @@ wss.on('connection', (ws) => {
     const room = rooms.get(code);
     if (!room) return;
 
-    console.log(`[${code}] a player disconnected`);
-    relay(room, ws, { type: 'opponent_disconnected' });
+    const idx = room.sockets.indexOf(ws);
+    console.log(`[${code}] player #${idx} disconnected`);
+    relay(room, ws, { type: 'player_disconnected', playerIndex: idx });
     rooms.delete(code);
   });
 });
