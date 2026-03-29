@@ -7,6 +7,7 @@ interface ScoreBoardProps {
   isGameOver: boolean;
   onNewRound?: () => void;
   onNewGame?: () => void;
+  compact?: boolean;
 }
 
 export default function ScoreBoard({
@@ -15,13 +16,51 @@ export default function ScoreBoard({
   isGameOver,
   onNewRound,
   onNewGame,
+  compact = false,
 }: ScoreBoardProps) {
   const sorted = [...players].sort((a, b) => a.totalScore - b.totalScore);
   const winner = sorted[0];
 
+  // ── Compact mode (mobile top bar) ──────────────────────────────────────────
+  if (compact) {
+    const tinyBtn: React.CSSProperties = {
+      background: isGameOver
+        ? 'linear-gradient(135deg,#4CAF50,#03A9F4)'
+        : 'linear-gradient(135deg,#E91E63,#FF9800)',
+      fontSize: '0.7rem',
+      padding: '0.25rem 0.65rem',
+    };
+    return (
+      <div className="flex flex-wrap gap-1.5 items-center justify-end">
+        {sorted.map((p, rank) => (
+          <div
+            key={p.id}
+            className="flex items-center gap-1 px-2 py-0.5 rounded-full"
+            style={{
+              background: rank === 0 ? 'rgba(255,215,0,0.18)' : 'rgba(0,0,0,0.3)',
+              border: `1px solid ${rank === 0 ? 'rgba(255,215,0,0.55)' : 'rgba(255,255,255,0.15)'}`,
+              fontFamily: 'var(--font-game)',
+            }}
+          >
+            <span style={{ fontSize: '0.7rem' }}>{rank === 0 ? '🥇' : rank === 1 ? '🥈' : '🥉'}</span>
+            <span style={{ color: 'rgba(255,255,255,0.9)', fontSize: '0.72rem' }}>{p.name}</span>
+            <span style={{ color: '#FFD700', fontWeight: 700, fontSize: '0.72rem' }}>{p.totalScore}</span>
+          </div>
+        ))}
+        {isGameOver && (
+          <button className="btn-candy" style={tinyBtn} onClick={onNewGame}>Rejouer</button>
+        )}
+        {onNewRound && !isGameOver && (
+          <button className="btn-candy" style={tinyBtn} onClick={onNewRound}>→</button>
+        )}
+      </div>
+    );
+  }
+
+  // ── Full mode (desktop) ────────────────────────────────────────────────────
   return (
     <motion.div
-      className="rounded-2xl p-5 min-w-[240px]"
+      className="rounded-2xl p-4 sm:p-5 w-full sm:min-w-[220px] sm:w-auto"
       style={{
         background: 'rgba(0,0,0,0.35)',
         backdropFilter: 'blur(12px)',

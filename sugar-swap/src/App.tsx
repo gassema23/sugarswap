@@ -29,6 +29,77 @@ import type { GameState, GamePhase, Player } from './engine/types';
 // ─── App mode ─────────────────────────────────────────────────────────────────
 type AppMode = 'menu' | 'vs_ai_setup' | 'vs_ai' | 'vs_human';
 
+// ─── Responsive card sizes ────────────────────────────────────────────────────
+function useCardSizes() {
+  const get = () => {
+    const w = window.innerWidth;
+    if (w < 400) return { ai: 36, human: 42, me: 44 };
+    if (w < 640) return { ai: 42, human: 50, me: 52 };
+    return { ai: 60, human: 68, me: 68 };
+  };
+  const [sizes, setSizes] = useState(get);
+  useEffect(() => {
+    const handler = () => setSizes(get());
+    window.addEventListener('resize', handler, { passive: true });
+    return () => window.removeEventListener('resize', handler);
+  }, []);
+  return sizes;
+}
+
+// ─── Shared top bar (used by GameView + VsHumanGame) ─────────────────────────
+function GameTopBar({ gs, onNewRound, onNewGame }: {
+  gs: GameState;
+  onNewRound?: () => void;
+  onNewGame?: () => void;
+}) {
+  return (
+    <div className="w-full max-w-6xl flex flex-col gap-1">
+      {/* Row 1: Logo + round | [mobile: compact scores] | [desktop: message + full scores] */}
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-1.5 shrink-0">
+          <Logo size="sm" />
+          <div
+            className="px-2 py-0.5 sm:px-3 sm:py-1 rounded-full text-xs sm:text-sm font-bold"
+            style={{ background: 'rgba(0,0,0,0.3)', color: 'rgba(255,255,255,0.6)', backdropFilter: 'blur(6px)', border: '1px solid rgba(255,255,255,0.15)' }}
+          >
+            <span className="sm:hidden">M.{gs.roundNumber}</span>
+            <span className="hidden sm:inline">Manche {gs.roundNumber}</span>
+          </div>
+        </div>
+
+        {/* Desktop: message centré */}
+        <div className="hidden sm:flex flex-1 justify-center">
+          <GameMessage message={gs.message} />
+        </div>
+
+        {/* Desktop: ScoreBoard complet */}
+        <div className="hidden sm:block">
+          <ScoreBoard
+            players={gs.players} roundNumber={gs.roundNumber}
+            isGameOver={gs.phase === 'game_over'}
+            onNewRound={onNewRound} onNewGame={onNewGame}
+          />
+        </div>
+
+        {/* Mobile: scores compacts */}
+        <div className="sm:hidden flex-1 flex justify-end">
+          <ScoreBoard
+            compact
+            players={gs.players} roundNumber={gs.roundNumber}
+            isGameOver={gs.phase === 'game_over'}
+            onNewRound={onNewRound} onNewGame={onNewGame}
+          />
+        </div>
+      </div>
+
+      {/* Row 2 mobile: message */}
+      <div className="sm:hidden w-full flex justify-center">
+        <GameMessage message={gs.message} />
+      </div>
+    </div>
+  );
+}
+
 // ─── Sound side-effects hook (shared by both vs_ai and vs_human) ──────────────
 function useSoundEffects(gameState: GameState | null) {
   const prevPhaseRef     = useRef<string | null>(null);
@@ -85,7 +156,7 @@ function ModeMenu({ onSelect, onRules }: { onSelect: (m: AppMode) => void; onRul
           backdropFilter: 'blur(14px)',
           border: '2px solid rgba(255,215,0,0.35)',
           boxShadow: '0 8px 40px rgba(0,0,0,0.3)',
-          minWidth: 260,
+          width: 'min(calc(100vw - 32px), 300px)',
         }}
       >
         <h2 style={{ fontFamily: 'var(--font-game)', color: '#FFD700', margin: 0, fontSize: '1.3rem', textShadow: '0 0 12px rgba(255,215,0,0.5)' }}>
@@ -159,7 +230,7 @@ function VsAiSetup({ onStart, onBack }: { onStart: (names: string[]) => void; on
           backdropFilter: 'blur(14px)',
           border: '2px solid rgba(255,215,0,0.35)',
           boxShadow: '0 8px 40px rgba(0,0,0,0.3)',
-          minWidth: 270,
+          width: 'min(calc(100vw - 32px), 310px)',
           fontFamily: 'var(--font-game)',
         }}
       >
@@ -214,6 +285,7 @@ function GameView({
   onNewRound,
   onNewGame,
 }: GameViewProps) {
+  const sizes       = useCardSizes();
   const topDiscard  = gs.discardPile[gs.discardPile.length - 1] ?? null;
   const humanPlayer = gs.players.find(p => p.isHuman);
   const aiPlayer    = gs.players.find(p => !p.isHuman);
@@ -233,33 +305,18 @@ function GameView({
   return (
     <motion.div
       key="game"
-      className="w-full flex flex-col items-center px-4 py-2 gap-2 relative z-10"
+      className="w-full flex flex-col items-center px-3 sm:px-4 py-2 gap-2 relative z-10"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
     >
-      {/* Top bar */}
-      <div className="w-full max-w-6xl flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <Logo size="sm" />
-          <div
-            className="px-3 py-1 rounded-full text-sm font-bold"
-            style={{ background: 'rgba(0,0,0,0.3)', color: 'rgba(255,255,255,0.6)', backdropFilter: 'blur(6px)', border: '1px solid rgba(255,255,255,0.15)' }}
-          >
-            Manche {gs.roundNumber}
-          </div>
-        </div>
-        <GameMessage message={gs.message} />
-        <ScoreBoard
-          players={gs.players}
-          roundNumber={gs.roundNumber}
-          isGameOver={gs.phase === 'game_over'}
-          onNewRound={gs.phase === 'round_end' ? onNewRound : undefined}
-          onNewGame={gs.phase === 'game_over' ? onNewGame : undefined}
-        />
-      </div>
+      <GameTopBar
+        gs={gs}
+        onNewRound={gs.phase === 'round_end' ? onNewRound : undefined}
+        onNewGame={gs.phase === 'game_over' ? onNewGame : undefined}
+      />
 
-      {/* Main row */}
-      <div className="flex items-center justify-center gap-6 flex-1">
+      {/* Main area — vertical on mobile, horizontal on desktop */}
+      <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-6 w-full">
         {aiPlayer && (
           <PlayerBoard
             player={aiPlayer}
@@ -267,7 +324,7 @@ function GameView({
             isHuman={false}
             turnPhase={gs.turnPhase}
             gamePhase={gs.phase}
-            cardSize={60}
+            cardSize={sizes.ai}
           />
         )}
         <DeckDiscard
@@ -289,7 +346,7 @@ function GameView({
             turnPhase={gs.turnPhase}
             gamePhase={gs.phase}
             onCardClick={onCardClick}
-            cardSize={68}
+            cardSize={sizes.human}
           />
         )}
       </div>
@@ -428,6 +485,7 @@ function VsHumanGame({ onBackToMenu }: { onBackToMenu: () => void }) {
   } = useOnlineGame();
 
   useSoundEffects(gameState);
+  const sizes = useCardSizes();
 
   const isLobbyState = (
     status === 'idle' || status === 'connecting' || status === 'waiting' ||
@@ -480,30 +538,15 @@ function VsHumanGame({ onBackToMenu }: { onBackToMenu: () => void }) {
   return (
     <motion.div
       key="online-game"
-      className="w-full flex flex-col items-center px-4 py-2 gap-2 relative z-10"
+      className="w-full flex flex-col items-center px-3 sm:px-4 py-2 gap-2 relative z-10"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
     >
-      {/* Top bar */}
-      <div className="w-full max-w-6xl flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <Logo size="sm" />
-          <div
-            className="px-3 py-1 rounded-full text-sm font-bold"
-            style={{ background: 'rgba(0,0,0,0.3)', color: 'rgba(255,255,255,0.6)', backdropFilter: 'blur(6px)', border: '1px solid rgba(255,255,255,0.15)' }}
-          >
-            Manche {gs.roundNumber}
-          </div>
-        </div>
-        <GameMessage message={gs.message} />
-        <ScoreBoard
-          players={gs.players}
-          roundNumber={gs.roundNumber}
-          isGameOver={gs.phase === 'game_over'}
-          onNewRound={gs.phase === 'round_end' ? () => { playButtonClick(); newRound(); } : undefined}
-          onNewGame={gs.phase === 'game_over' ? () => { playButtonClick(); disconnect(); onBackToMenu(); } : undefined}
-        />
-      </div>
+      <GameTopBar
+        gs={gs}
+        onNewRound={gs.phase === 'round_end' ? () => { playButtonClick(); newRound(); } : undefined}
+        onNewGame={gs.phase === 'game_over' ? () => { playButtonClick(); disconnect(); onBackToMenu(); } : undefined}
+      />
 
       {/* Compact players status bar */}
       <OnlinePlayersBar players={gs.players} currentPlayerIndex={gs.currentPlayerIndex} gamePhase={gs.phase} />
@@ -530,7 +573,7 @@ function VsHumanGame({ onBackToMenu }: { onBackToMenu: () => void }) {
           turnPhase={gs.turnPhase}
           gamePhase={gs.phase}
           onCardClick={handleCardClick}
-          cardSize={68}
+          cardSize={sizes.me}
           showLabel={false}
         />
       )}

@@ -345,7 +345,7 @@ function LobbyCard({ children }: { children: React.ReactNode }) {
         backdropFilter: 'blur(16px)',
         border: '2px solid rgba(255,215,0,0.3)',
         boxShadow: '0 8px 40px rgba(0,0,0,0.35)',
-        minWidth: 310,
+        width: 'min(calc(100vw - 32px), 360px)',
         fontFamily: 'var(--font-game)',
       }}
       initial={{ opacity: 0, scale: 0.88 }}
