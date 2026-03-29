@@ -14,7 +14,7 @@ import {
   playButtonClick,
   playDrawDeck,
   playDrawDiscard,
-  playDiscard,
+  playDiscard, 
   playSwapCard,
   playColumnEliminated,
   playTurnStart,

@@ -90,28 +90,32 @@ jobs:
       - name: Verify SSH private key (fingerprint only)
         run: ssh-keygen -l -f "$GITHUB_WORKSPACE/.deploy_ssh_key"
 
+      # OpenSSH du runner (plus compatible que drone-scp) — si ça échoue encore, la clé ne correspond pas à authorized_keys.
       - name: Copy config files to VPS
-        uses: appleboy/scp-action@v1.0.0
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key_path: ${{ github.workspace }}/.deploy_ssh_key
-          source: "sugar-swap/docker-compose.yml,sugar-swap/Caddyfile"
-          target: ${{ env.DEPLOY_DIR }}
-          strip_components: 1
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+        run: |
+          set -euo pipefail
+          KEY="$GITHUB_WORKSPACE/.deploy_ssh_key"
+          ssh -i "$KEY" -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=accept-new \
+            "$VPS_USER@$VPS_HOST" "mkdir -p -- \"$DEPLOY_DIR\""
+          scp -i "$KEY" -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=accept-new \
+            sugar-swap/docker-compose.yml sugar-swap/Caddyfile \
+            "$VPS_USER@$VPS_HOST:$DEPLOY_DIR/"
 
       - name: Pull images & restart
-        uses: appleboy/ssh-action@v1.2.5
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key_path: ${{ github.workspace }}/.deploy_ssh_key
-          script: |
-            cd ${{ env.DEPLOY_DIR }}
-            echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
-            docker compose pull
-            docker compose up -d --remove-orphans
-            docker image prune -f
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_ACTOR: ${{ github.actor }}
+        run: |
+          set -euo pipefail
+          KEY="$GITHUB_WORKSPACE/.deploy_ssh_key"
+          ssh -i "$KEY" -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=accept-new \
+            "$VPS_USER@$VPS_HOST" \
+            "set -euo pipefail; cd \"$DEPLOY_DIR\"; echo \"$GH_TOKEN\" | docker login ghcr.io -u \"$GH_ACTOR\" --password-stdin; docker compose pull; docker compose up -d --remove-orphans; docker image prune -f"
 
       - name: Remove deploy SSH key file
         if: always()
