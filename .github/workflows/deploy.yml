@@ -62,12 +62,33 @@ jobs:
       - name: Checkout (for docker-compose + Caddyfile)
         uses: actions/checkout@v4
 
+      # Secrets multilignes (clé SSH) passées en INPUT_KEY vers Docker peuvent arriver vides.
+      # Fichier dans le workspace = monté dans le conteneur → utiliser key_path.
+      - name: Check deploy secrets
+        run: |
+          ok=1
+          [ -n "$VPS_HOST" ] || { echo "::error::Secret VPS_HOST vide — Settings → Secrets and variables → Actions"; ok=0; }
+          [ -n "$VPS_USER" ] || { echo "::error::Secret VPS_USER vide"; ok=0; }
+          [ -n "$VPS_SSH_KEY" ] || { echo "::error::Secret VPS_SSH_KEY vide — vérifie le nom exact et le dépôt GitHub (ex. gassema23/sugarswap)"; ok=0; }
+          [ "$ok" = 1 ] || exit 1
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+
+      - name: Write SSH key for deploy actions
+        run: |
+          install -m 600 /dev/null "$GITHUB_WORKSPACE/.deploy_ssh_key"
+          printf '%s\n' "$VPS_SSH_KEY" > "$GITHUB_WORKSPACE/.deploy_ssh_key"
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+
       - name: Copy config files to VPS
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_SSH_KEY }}
+          key_path: .deploy_ssh_key
           source: "sugar-swap/docker-compose.yml,sugar-swap/Caddyfile"
           target: "/home/ubuntu/sugarswap"
           strip_components: 1
@@ -77,10 +98,14 @@ jobs:
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_SSH_KEY }}
+          key_path: .deploy_ssh_key
           script: |
             cd /home/ubuntu/sugarswap
             echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
             docker compose pull
             docker compose up -d --remove-orphans
             docker image prune -f
+
+      - name: Remove deploy SSH key file
+        if: always()
+        run: rm -f "$GITHUB_WORKSPACE/.deploy_ssh_key"
