@@ -113,15 +113,15 @@ jobs:
         run: |
           set -euo pipefail
           KEY="$GITHUB_WORKSPACE/.deploy_ssh_key"
-          # Session SSH non interactive : PATH souvent minimal (pas /snap/bin, etc.) → « docker: command not found ».
+          # PATH minimal en SSH ; sudo docker = accès au socket si l’utilisateur n’est pas dans le groupe « docker ».
           ssh -i "$KEY" -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=accept-new \
             "$VPS_USER@$VPS_HOST" \
             "export PATH=\"/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin\"; \
              set -euo pipefail; \
              command -v docker >/dev/null || { echo '::error::docker introuvable sur le VPS — installe Docker (ex. apt install docker.io) ou ajoute son répertoire au PATH'; exit 127; }; \
              cd \"$DEPLOY_DIR\"; \
-             echo \"$GH_TOKEN\" | docker login ghcr.io -u \"$GH_ACTOR\" --password-stdin; \
-             docker compose pull; docker compose up -d --remove-orphans; docker image prune -f"
+             echo \"$GH_TOKEN\" | sudo -n docker login ghcr.io -u \"$GH_ACTOR\" --password-stdin; \
+             sudo -n docker compose pull; sudo -n docker compose up -d --remove-orphans; sudo -n docker image prune -f"
 
       - name: Remove deploy SSH key file
         if: always()
