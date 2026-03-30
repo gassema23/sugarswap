@@ -34,8 +34,8 @@ jobs:
       - name: Build & push frontend
         uses: docker/build-push-action@v6
         with:
-          context: ./sugar-swap
-          file: ./sugar-swap/Dockerfile.frontend
+          context: ./frontend
+          file: ./frontend/Dockerfile.frontend
           push: true
           tags: ${{ env.FRONTEND_IMAGE }}:latest
           build-args: |
@@ -46,8 +46,8 @@ jobs:
       - name: Build & push backend
         uses: docker/build-push-action@v6
         with:
-          context: ./sugar-swap
-          file: ./sugar-swap/Dockerfile.backend
+          context: ./frontend
+          file: ./frontend/Dockerfile.backend
           push: true
           tags: ${{ env.BACKEND_IMAGE }}:latest
           cache-from: type=gha
@@ -101,7 +101,7 @@ jobs:
           ssh -i "$KEY" -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=accept-new \
             "$VPS_USER@$VPS_HOST" "mkdir -p -- \"$DEPLOY_DIR\""
           scp -i "$KEY" -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=accept-new \
-            sugar-swap/docker-compose.yml sugar-swap/Caddyfile \
+            frontend/docker-compose.yml frontend/Caddyfile \
             "$VPS_USER@$VPS_HOST:$DEPLOY_DIR/"
 
       - name: Pull images & restart

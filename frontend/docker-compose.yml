@@ -1,0 +1,38 @@
+services:
+  frontend:
+    image: ghcr.io/gassema23/sugarswap-frontend:latest
+    restart: unless-stopped
+    networks:
+      - app
+
+  backend:
+    image: ghcr.io/gassema23/sugarswap-backend:latest
+    restart: unless-stopped
+    environment:
+      - PORT=3001
+    networks:
+      - app
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - app
+    depends_on:
+      - frontend
+      - backend
+
+volumes:
+  caddy_data:
+  caddy_config:
+
+networks:
+  app:
+    driver: bridge

@@ -1,0 +1,13 @@
+vynia.app {
+    # WebSocket backend — must come before the catch-all
+    handle /ws {
+        reverse_proxy backend:3001
+    }
+
+    # Frontend static app
+    handle {
+        reverse_proxy frontend:80
+    }
+
+    encode gzip
+}
