@@ -7,7 +7,7 @@ on:
 env:
   REGISTRY: ghcr.io
   FRONTEND_IMAGE: ghcr.io/gassema23/sugarswap-frontend
-  BACKEND_IMAGE: ghcr.io/gassema23/sugarswap-backend
+  BACKEND_IMAGE:  ghcr.io/gassema23/sugarswap-backend
 
 jobs:
   build-and-push:
@@ -46,8 +46,8 @@ jobs:
       - name: Build & push backend
         uses: docker/build-push-action@v6
         with:
-          context: ./frontend
-          file: ./frontend/Dockerfile.backend
+          context: ./backend
+          file: ./backend/Dockerfile
           push: true
           tags: ${{ env.BACKEND_IMAGE }}:latest
           cache-from: type=gha
@@ -57,10 +57,8 @@ jobs:
     name: Deploy to VPS
     runs-on: ubuntu-latest
     needs: build-and-push
-    # Sans ça, les secrets de l’environnement « Prod » ne sont pas disponibles (restent vides).
     environment: Prod
     env:
-      # Doit correspondre à VPS_USER (utilisateur qui a la clé dans ~/.ssh/authorized_keys).
       DEPLOY_DIR: /home/${{ secrets.VPS_USER }}/sugarswap
 
     steps:
@@ -70,16 +68,15 @@ jobs:
       - name: Check deploy secrets
         run: |
           ok=1
-          [ -n "$VPS_HOST" ] || { echo "::error::Secret VPS_HOST vide — vérifie l’environnement « Prod » ou les secrets du dépôt"; ok=0; }
-          [ -n "$VPS_USER" ] || { echo "::error::Secret VPS_USER vide"; ok=0; }
-          [ -n "$VPS_SSH_KEY" ] || { echo "::error::Secret VPS_SSH_KEY vide — nom exact VPS_SSH_KEY dans l’environnement Prod"; ok=0; }
+          [ -n "$VPS_HOST" ]    || { echo "::error::Secret VPS_HOST vide";    ok=0; }
+          [ -n "$VPS_USER" ]    || { echo "::error::Secret VPS_USER vide";    ok=0; }
+          [ -n "$VPS_SSH_KEY" ] || { echo "::error::Secret VPS_SSH_KEY vide"; ok=0; }
           [ "$ok" = 1 ] || exit 1
         env:
-          VPS_HOST: ${{ secrets.VPS_HOST }}
-          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_HOST:    ${{ secrets.VPS_HOST }}
+          VPS_USER:    ${{ secrets.VPS_USER }}
           VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
 
-      # Composite actions (v1) lisent la clé sur le runner → 600 OK. v0.1.x Docker = autre UID → 644.
       - name: Write SSH key for deploy actions
         run: |
           printf '%s\n' "$VPS_SSH_KEY" > "$GITHUB_WORKSPACE/.deploy_ssh_key"
@@ -90,7 +87,6 @@ jobs:
       - name: Verify SSH private key (fingerprint only)
         run: ssh-keygen -l -f "$GITHUB_WORKSPACE/.deploy_ssh_key"
 
-      # OpenSSH du runner (plus compatible que drone-scp) — si ça échoue encore, la clé ne correspond pas à authorized_keys.
       - name: Copy config files to VPS
         env:
           VPS_HOST: ${{ secrets.VPS_HOST }}
@@ -100,28 +96,30 @@ jobs:
           KEY="$GITHUB_WORKSPACE/.deploy_ssh_key"
           ssh -i "$KEY" -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=accept-new \
             "$VPS_USER@$VPS_HOST" "mkdir -p -- \"$DEPLOY_DIR\""
+          # docker-compose.yml and Caddyfile are now at the repo root
           scp -i "$KEY" -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=accept-new \
-            frontend/docker-compose.yml frontend/Caddyfile \
+            docker-compose.yml Caddyfile \
             "$VPS_USER@$VPS_HOST:$DEPLOY_DIR/"
 
       - name: Pull images & restart
         env:
-          VPS_HOST: ${{ secrets.VPS_HOST }}
-          VPS_USER: ${{ secrets.VPS_USER }}
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GH_ACTOR: ${{ github.actor }}
+          VPS_HOST:  ${{ secrets.VPS_HOST }}
+          VPS_USER:  ${{ secrets.VPS_USER }}
+          GH_TOKEN:  ${{ secrets.GITHUB_TOKEN }}
+          GH_ACTOR:  ${{ github.actor }}
         run: |
           set -euo pipefail
           KEY="$GITHUB_WORKSPACE/.deploy_ssh_key"
-          # PATH minimal en SSH ; sudo docker = accès au socket si l’utilisateur n’est pas dans le groupe « docker ».
           ssh -i "$KEY" -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=accept-new \
             "$VPS_USER@$VPS_HOST" \
             "export PATH=\"/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/snap/bin\"; \
              set -euo pipefail; \
-             command -v docker >/dev/null || { echo '::error::docker introuvable sur le VPS — installe Docker (ex. apt install docker.io) ou ajoute son répertoire au PATH'; exit 127; }; \
+             command -v docker >/dev/null || { echo '::error::docker introuvable'; exit 127; }; \
              cd \"$DEPLOY_DIR\"; \
              echo \"$GH_TOKEN\" | sudo -n docker login ghcr.io -u \"$GH_ACTOR\" --password-stdin; \
-             sudo -n docker compose pull; sudo -n docker compose up -d --remove-orphans; sudo -n docker image prune -f"
+             sudo -n docker compose pull; \
+             sudo -n docker compose up -d --remove-orphans; \
+             sudo -n docker image prune -f"
 
       - name: Remove deploy SSH key file
         if: always()

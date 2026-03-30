@@ -1,0 +1,54 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── User ─────────────────────────────────────────────────────────────────────
+
+model User {
+  id            String   @id @default(cuid())
+  socialId      String
+  provider      String   // "google" | "facebook"
+  name          String
+  avatar        String?
+  level         Int      @default(1)
+  experience    Int      @default(0)
+  totalMatches  Int      @default(0)
+  totalPoints   Int      @default(0)
+  unlockedSkins String[] @default([])
+  badges        Badge[]
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([socialId, provider])
+  @@index([totalMatches])
+}
+
+// ─── Badge ────────────────────────────────────────────────────────────────────
+
+model Badge {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      BadgeType
+  awardedAt DateTime @default(now())
+
+  @@unique([userId, type])
+  @@index([userId])
+}
+
+enum BadgeType {
+  FIRST_WIN        // Première victoire
+  VETERAN          // 10 parties jouées
+  GRAND_MASTER     // 50 parties jouées
+  SHARP_MIND       // Score ≤ 10 points en une partie
+  PERFECTIONIST    // Score 0 points en une partie
+  LEVEL_5          // Atteint niveau 5
+  LEVEL_10         // Atteint niveau 10
+  LEVEL_15         // Atteint niveau 15
+  SOCIAL_BUTTERFLY // A joué en ligne
+}

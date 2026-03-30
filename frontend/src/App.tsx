@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useGame } from './hooks/useGame';
 import { useOnlineGame } from './hooks/useOnlineGame';
+import { useAuth } from './hooks/useAuth';
 import Background from './components/Background';
 import Logo from './components/Logo';
 import PlayerBoard from './components/PlayerBoard';
@@ -13,6 +14,7 @@ import GameMenu from './components/GameMenu';
 import OnlineLobby from './components/OnlineLobby';
 import RulesModal from './components/RulesModal';
 import GameIcon from './components/GameIcon';
+import ProgressionToast from './components/ProgressionToast';
 import {
   playButtonClick,
   playDrawDeck,
@@ -574,13 +576,24 @@ function OnlinePlayersBar({
 }
 
 // ─── VS HUMAN (online) game controller ───────────────────────────────────────
-function VsHumanGame({ onBackToMenu }: { onBackToMenu: () => void }) {
+interface VsHumanGameProps {
+  onBackToMenu: () => void;
+  token:        string | null;
+  authUser:     import('./hooks/useAuth').AuthUser | null;
+  authLoading:  boolean;
+  onLoginGoogle:   () => void;
+  onLoginFacebook: () => void;
+  onLogout:        () => void;
+}
+
+function VsHumanGame({ onBackToMenu, token, authUser, authLoading, onLoginGoogle, onLoginFacebook, onLogout }: VsHumanGameProps) {
   const {
     gameState, status, roomCode, players, maxPlayers, playerIndex, errorMsg,
+    progressionUpdate, clearProgressionUpdate,
     createRoom, joinRoom, startOnlineGame,
     initialReveal, drawDiscard, drawDeck, discardCard,
     swapCard, revealCard, newRound, disconnect,
-  } = useOnlineGame();
+  } = useOnlineGame(token);
 
   useSoundEffects(gameState);
   const sizes = useCardSizes();
@@ -613,6 +626,11 @@ function VsHumanGame({ onBackToMenu }: { onBackToMenu: () => void }) {
           maxPlayers={maxPlayers}
           playerIndex={playerIndex}
           errorMsg={errorMsg}
+          authUser={authUser}
+          authLoading={authLoading}
+          onLoginGoogle={onLoginGoogle}
+          onLoginFacebook={onLoginFacebook}
+          onLogout={onLogout}
           onCreateRoom={createRoom}
           onJoinRoom={joinRoom}
           onStartGame={startOnlineGame}
@@ -707,6 +725,8 @@ function VsHumanGame({ onBackToMenu }: { onBackToMenu: () => void }) {
         onResume={() => setShowMenu(false)}
         onQuit={() => { disconnect(); onBackToMenu(); }}
       />
+
+      <ProgressionToast update={progressionUpdate} onDismiss={clearProgressionUpdate} />
     </motion.div>
   );
 }
@@ -716,6 +736,7 @@ export default function App() {
   const [mode, setMode]         = useState<AppMode>('menu');
   const [names, setNames]       = useState<string[]>([]);
   const [showRules, setShowRules] = useState(false);
+  const { user: authUser, token, loading: authLoading, loginWithGoogle, loginWithFacebook, logout } = useAuth();
 
   function handleVsAiStart(n: string[]) {
     setNames(n);
@@ -757,7 +778,15 @@ export default function App() {
 
         {mode === 'vs_human' && (
           <motion.div key="vshuman" className="flex-1 flex min-h-0 w-full" exit={{ opacity: 0 }}>
-            <VsHumanGame onBackToMenu={() => setMode('menu')} />
+            <VsHumanGame
+              onBackToMenu={() => setMode('menu')}
+              token={token}
+              authUser={authUser}
+              authLoading={authLoading}
+              onLoginGoogle={loginWithGoogle}
+              onLoginFacebook={loginWithFacebook}
+              onLogout={logout}
+            />
           </motion.div>
         )}
       </AnimatePresence>

@@ -1,0 +1,18 @@
+vynia.app {
+    # WebSocket relay — must be matched before /api catch-all
+    handle /ws {
+        reverse_proxy backend:3001
+    }
+
+    # REST API (NestJS, prefix /api)
+    handle /api/* {
+        reverse_proxy backend:3001
+    }
+
+    # Frontend static app
+    handle {
+        reverse_proxy frontend:80
+    }
+
+    encode gzip
+}

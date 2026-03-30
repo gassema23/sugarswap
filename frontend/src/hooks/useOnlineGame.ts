@@ -7,6 +7,13 @@
  *  • The server relays it to all other clients in the room.
  *  • Each receiving client calls setState() to replace its local state.
  *  • isHuman flags are re-mapped on receipt so each client sees itself as "human".
+ *
+ * Auth integration:
+ *  • If a JWT token is provided, it is sent in create_room / join_room so the
+ *    server can associate the socket with a user account.
+ *  • When the game ends (phase === 'game_over'), the host sends a game_over
+ *    event so the server can persist stats for all authenticated players.
+ *  • The server responds with progression_update events per authenticated player.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -15,19 +22,30 @@ import { useGame } from './useGame';
 import { initGame } from '../engine/gameEngine';
 
 // ─── Config ───────────────────────────────────────────────────────────────────
+
 const WS_URL = (import.meta as { env: Record<string, string> }).env.VITE_WS_URL
-  ?? 'ws://localhost:3001';
+  ?? 'ws://localhost:3001/ws';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
+
 export type OnlineStatus =
   | 'idle'
   | 'connecting'
-  | 'waiting'              // room created, waiting for more players
-  | 'ready'                // all slots filled → host about to start
+  | 'waiting'
+  | 'ready'
   | 'playing'
   | 'player_disconnected'
-  | 'opponent_disconnected' // alias kept for legacy display
+  | 'opponent_disconnected'
   | 'error';
+
+export interface ProgressionUpdate {
+  gainedXp:      number;
+  newLevel:      number;
+  levelUp:       boolean;
+  newBadges:     string[];
+  unlockedSkins: string[];
+  jokers:        { peek: number; swap: number; freeze: number };
+}
 
 type ServerMsg =
   | { type: 'room_created';        code: string; playerIndex: 0; maxPlayers: number }
@@ -36,10 +54,12 @@ type ServerMsg =
   | { type: 'state_update';        state: GameState }
   | { type: 'player_disconnected'; playerIndex: number }
   | { type: 'opponent_disconnected' }
+  | { type: 'progression_update' } & ProgressionUpdate
   | { type: 'error';               message: string }
   | { type: 'pong' };
 
-// ─── Helper: remap isHuman flags for the local player's perspective ───────────
+// ─── Helper ───────────────────────────────────────────────────────────────────
+
 function remapIsHuman(state: GameState, myIdx: number): GameState {
   return {
     ...state,
@@ -48,7 +68,8 @@ function remapIsHuman(state: GameState, myIdx: number): GameState {
 }
 
 // ─── Hook ─────────────────────────────────────────────────────────────────────
-export function useOnlineGame() {
+
+export function useOnlineGame(token: string | null = null) {
   const {
     gameState, setState, startGame: _start,
     initialReveal: _initialReveal,
@@ -60,25 +81,35 @@ export function useOnlineGame() {
     newRound: _newRound,
   } = useGame();
 
-  const [status, setStatus]         = useState<OnlineStatus>('idle');
-  const [roomCode, setRoomCode]     = useState<string | null>(null);
-  const [playerIndex, setPlayerIndex] = useState<number | null>(null);
-  const [players, setPlayers]       = useState<string[]>([]);   // all player names
-  const [maxPlayers, setMaxPlayers] = useState<number>(2);
-  const [errorMsg, setErrorMsg]     = useState<string | null>(null);
-  const [myName, setMyName]         = useState('');
+  const [status, setStatus]             = useState<OnlineStatus>('idle');
+  const [roomCode, setRoomCode]         = useState<string | null>(null);
+  const [playerIndex, setPlayerIndex]   = useState<number | null>(null);
+  const [players, setPlayers]           = useState<string[]>([]);
+  const [maxPlayers, setMaxPlayers]     = useState<number>(2);
+  const [errorMsg, setErrorMsg]         = useState<string | null>(null);
+  const [myName, setMyName]             = useState('');
+  const [progressionUpdate, setProgressionUpdate] = useState<ProgressionUpdate | null>(null);
 
-  const wsRef          = useRef<WebSocket | null>(null);
-  const myIdxRef       = useRef<number | null>(null);  // stable ref for callbacks
-  const codeRef        = useRef<string | null>(null);
-  const maxPlayersRef  = useRef<number>(2);
-  const statusRef      = useRef<OnlineStatus>('idle');
-  statusRef.current    = status;
+  const wsRef           = useRef<WebSocket | null>(null);
+  const myIdxRef        = useRef<number | null>(null);
+  const codeRef         = useRef<string | null>(null);
+  const maxPlayersRef   = useRef<number>(2);
+  const statusRef       = useRef<OnlineStatus>('idle');
+  const sentGameOverRef = useRef(false);
+  statusRef.current     = status;
+
+  // Keep token in a ref so callbacks always see the latest value
+  const tokenRef = useRef<string | null>(token);
+  tokenRef.current = token;
 
   // ── Send helper ─────────────────────────────────────────────────────────────
-  const wsSend = useCallback((msg: object) => {
+  // The NestJS WsAdapter expects { event: "name", data: {...} }.
+  // We keep the internal API as { type, ...rest } for readability and convert here.
+  const wsSend = useCallback((msg: Record<string, unknown>) => {
     const ws = wsRef.current;
-    if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg));
+    if (ws?.readyState !== WebSocket.OPEN) return;
+    const { type, ...data } = msg;
+    ws.send(JSON.stringify({ event: type, data }));
   }, []);
 
   // ── Broadcast state after each local action ──────────────────────────────
@@ -107,18 +138,18 @@ export function useOnlineGame() {
 
       ws.onmessage = (ev) => {
         let msg: ServerMsg;
-        try { msg = JSON.parse(ev.data); } catch { return; }
+        try { msg = JSON.parse(ev.data as string); } catch { return; }
 
         if (msg.type === 'pong') return;
 
         if (msg.type === 'room_created') {
-          myIdxRef.current     = 0;
-          codeRef.current      = msg.code;
+          myIdxRef.current      = 0;
+          codeRef.current       = msg.code;
           maxPlayersRef.current = msg.maxPlayers;
           setPlayerIndex(0);
           setRoomCode(msg.code);
           setMaxPlayers(msg.maxPlayers);
-          setPlayers([myName]);  // host is player 0
+          setPlayers([myName]);
           setStatus('waiting');
         }
 
@@ -130,13 +161,11 @@ export function useOnlineGame() {
           setRoomCode(msg.code);
           setMaxPlayers(msg.maxPlayers);
           setPlayers(msg.players);
-          // Non-host joiners wait in lobby until state_update arrives
           setStatus('waiting');
         }
 
         if (msg.type === 'player_joined') {
           setPlayers(msg.players);
-          // Auto-start when room is full (host only)
           if (myIdxRef.current === 0 && msg.players.length === maxPlayersRef.current) {
             setStatus('ready');
           }
@@ -145,12 +174,16 @@ export function useOnlineGame() {
         if (msg.type === 'state_update') {
           const myIdx = myIdxRef.current ?? 0;
           setState(remapIsHuman(msg.state, myIdx));
-          // Transition all non-playing clients (joiners waiting for host to start)
           if (statusRef.current !== 'playing') setStatus('playing');
         }
 
         if (msg.type === 'player_disconnected' || msg.type === 'opponent_disconnected') {
           setStatus('player_disconnected');
+        }
+
+        if (msg.type === 'progression_update') {
+          const { type: _t, ...update } = msg;
+          setProgressionUpdate(update as ProgressionUpdate);
         }
 
         if (msg.type === 'error') {
@@ -165,7 +198,7 @@ export function useOnlineGame() {
     });
   }, [myName, setState]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Host: all players joined → auto-start game ────────────────────────────
+  // ── Host: all players joined → auto-start ────────────────────────────────
   useEffect(() => {
     if (status !== 'ready' || myIdxRef.current !== 0) return;
     const t = setTimeout(() => {
@@ -174,9 +207,33 @@ export function useOnlineGame() {
       setState(mapped);
       broadcastState(mapped);
       setStatus('playing');
+      sentGameOverRef.current = false;
     }, 1200);
     return () => clearTimeout(t);
   }, [status, players, setState, broadcastState]);
+
+  // ── game_over: host sends event so server persists all players' stats ────
+  useEffect(() => {
+    if (!gameState || gameState.phase !== 'game_over') {
+      sentGameOverRef.current = false;
+      return;
+    }
+    // Only the host (player 0) sends the authoritative scores
+    if (myIdxRef.current !== 0) return;
+    if (sentGameOverRef.current) return;
+    sentGameOverRef.current = true;
+
+    const scores = gameState.players.map((p, i) => ({
+      playerIndex: i,
+      points: p.totalScore,
+    }));
+    wsSend({
+      type:     'game_over',
+      roomCode: codeRef.current,
+      scores,
+      token:    tokenRef.current,
+    });
+  }, [gameState?.phase, wsSend]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Public actions ────────────────────────────────────────────────────────
 
@@ -186,7 +243,7 @@ export function useOnlineGame() {
     maxPlayersRef.current = max;
     try {
       await connect();
-      wsSend({ type: 'create_room', playerName: name, maxPlayers: max });
+      wsSend({ type: 'create_room', playerName: name, maxPlayers: max, token: tokenRef.current });
     } catch { /* error already set */ }
   }, [connect, wsSend]);
 
@@ -195,11 +252,10 @@ export function useOnlineGame() {
     setErrorMsg(null);
     try {
       await connect();
-      wsSend({ type: 'join_room', roomCode: code.toUpperCase(), playerName: name });
+      wsSend({ type: 'join_room', roomCode: code.toUpperCase(), playerName: name, token: tokenRef.current });
     } catch { /* error already set */ }
   }, [connect, wsSend]);
 
-  /** Host manually starts the game (when ≥ 2 players but room not yet full). */
   const startOnlineGame = useCallback(() => {
     if (myIdxRef.current !== 0) return;
     setStatus('ready');
@@ -261,12 +317,15 @@ export function useOnlineGame() {
     setPlayers([]);
     setMaxPlayers(2);
     setErrorMsg(null);
+    setProgressionUpdate(null);
+    sentGameOverRef.current = false;
   }, []);
 
-  // Backward-compat: first opponent name for simple 2-player displays
+  const clearProgressionUpdate = useCallback(() => setProgressionUpdate(null), []);
+
   const opponentName = players.find((_, i) => i !== (myIdxRef.current ?? 0)) ?? null;
 
-  void _start; // unused in online mode
+  void _start;
 
   return {
     gameState,
@@ -277,6 +336,8 @@ export function useOnlineGame() {
     maxPlayers,
     opponentName,
     errorMsg,
+    progressionUpdate,
+    clearProgressionUpdate,
     createRoom,
     joinRoom,
     startOnlineGame,

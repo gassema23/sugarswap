@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { OnlineStatus } from '../hooks/useOnlineGame';
+import type { AuthUser } from '../hooks/useAuth';
 import { playButtonClick } from '../utils/sounds';
 import GameIcon from './GameIcon';
+import AuthPanel from './AuthPanel';
 
 interface Props {
   status:          OnlineStatus;
@@ -11,6 +13,13 @@ interface Props {
   maxPlayers:      number;
   playerIndex:     number | null;    // local player's index (0 = host)
   errorMsg:        string | null;
+  // Auth
+  authUser:        AuthUser | null;
+  authLoading:     boolean;
+  onLoginGoogle:   () => void;
+  onLoginFacebook: () => void;
+  onLogout:        () => void;
+  // Actions
   onCreateRoom:    (name: string, maxPlayers: number) => void;
   onJoinRoom:      (code: string, name: string) => void;
   onStartGame:     () => void;       // host early-start (when ≥ 2, room not full)
@@ -37,12 +46,18 @@ export default function OnlineLobby({
   maxPlayers,
   playerIndex,
   errorMsg,
+  authUser,
+  authLoading,
+  onLoginGoogle,
+  onLoginFacebook,
+  onLogout,
   onCreateRoom,
   onJoinRoom,
   onStartGame,
   onBack,
 }: Props) {
-  const [name, setName]           = useState('');
+  // Pre-fill name from logged-in user
+  const [name, setName]           = useState(authUser?.name ?? '');
   const [code, setCode]           = useState('');
   const [tab, setTab]             = useState<'create' | 'join'>('create');
   const [selectedMax, setSelectedMax] = useState(2);
@@ -50,16 +65,18 @@ export default function OnlineLobby({
   const isHost     = playerIndex === 0;
   const canStart   = isHost && players.length >= 2;
 
+  const displayName = authUser?.name ?? name;
+
   function handleCreate() {
-    if (!name.trim()) return;
+    if (!displayName.trim()) return;
     playButtonClick();
-    onCreateRoom(name.trim(), selectedMax);
+    onCreateRoom(displayName.trim(), selectedMax);
   }
 
   function handleJoin() {
-    if (!name.trim() || !code.trim()) return;
+    if (!displayName.trim() || !code.trim()) return;
     playButtonClick();
-    onJoinRoom(code.trim(), name.trim());
+    onJoinRoom(code.trim(), displayName.trim());
   }
 
   // ── Waiting for players ──────────────────────────────────────────────────
@@ -205,10 +222,19 @@ export default function OnlineLobby({
   // ── Default: Create / Join form ───────────────────────────────────────────
   return (
     <LobbyCard>
-      <h3 style={{ color: '#FFD700', margin: '0 0 12px', fontSize: '1.3rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+      <h3 style={{ color: '#FFD700', margin: '0 0 4px', fontSize: '1.3rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
         <GameIcon name="key" size={28} />
         Jouer en ligne
       </h3>
+
+      {/* Auth panel — sign in or show profile */}
+      <AuthPanel
+        user={authUser}
+        loading={authLoading}
+        onLoginGoogle={onLoginGoogle}
+        onLoginFacebook={onLoginFacebook}
+        onLogout={onLogout}
+      />
 
       {/* Tab selector */}
       <div className="flex gap-2 mb-4">
@@ -233,17 +259,19 @@ export default function OnlineLobby({
         ))}
       </div>
 
-      {/* Your name */}
-      <div className="flex flex-col gap-1 w-full mb-3">
-        <label style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.75rem' }}>Ton prénom</label>
-        <input
-          style={inputStyle}
-          value={name}
-          onChange={e => setName(e.target.value)}
-          placeholder="Alice"
-          maxLength={20}
-        />
-      </div>
+      {/* Your name — hidden when logged in (backend uses the OAuth name) */}
+      {!authUser && (
+        <div className="flex flex-col gap-1 w-full mb-3">
+          <label style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.75rem' }}>Ton prénom</label>
+          <input
+            style={inputStyle}
+            value={name}
+            onChange={e => setName(e.target.value)}
+            placeholder="Alice"
+            maxLength={20}
+          />
+        </div>
+      )}
 
       <AnimatePresence mode="wait">
         {tab === 'create' ? (
