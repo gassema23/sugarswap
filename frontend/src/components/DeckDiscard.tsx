@@ -55,15 +55,16 @@ export default function DeckDiscard({
   onDiscardDrawn,
   cardSize = 68,
 }: DeckDiscardProps) {
-  const h       = Math.round(cardSize * 1.35);
+  const h        = Math.round(cardSize * 1.35);
   const fontSize = cardSize < 50 ? '1.4rem' : '2rem';
   const labelSize = cardSize < 50 ? '0.7rem' : '0.875rem';
+  const isMobile = cardSize < 50;
 
   return (
     <div
-      className="flex flex-row items-end gap-y-4 gap-x-6 sm:gap-x-10"
+      className={`flex flex-row items-end gap-y-2 ${isMobile ? 'gap-x-3' : 'gap-x-6'} sm:gap-x-10`}
       style={{
-        padding: '10px 16px 12px',
+        padding: isMobile ? '6px 10px 8px' : '10px 16px 12px',
         borderRadius: 20,
         background: 'rgba(255,255,255,0.04)',
         border: '1px solid rgba(255,255,255,0.08)',
@@ -73,22 +74,24 @@ export default function DeckDiscard({
     >
 
       {/* Draw pile */}
-      <div className="flex flex-col items-center gap-2">
+      <div className="flex flex-col items-center gap-1.5">
+        {/* Label: desktop only */}
         <span
-          className="font-bold"
+          className="hidden sm:block font-bold"
           style={{
             fontFamily: 'var(--font-game)',
             fontSize: labelSize,
             color: 'white',
-            textShadow: '0 1px 6px rgba(0,0,0,0.7), 0 0 12px rgba(0,0,0,0.5)',
+            textShadow: '0 1px 6px rgba(0,0,0,0.7)',
           }}
         >
           Paquet ({deckCount})
         </span>
         <motion.div
           className={`relative ${canDrawDeck ? 'cursor-pointer' : 'opacity-70'}`}
+          style={{ touchAction: 'manipulation' }}
           whileHover={canDrawDeck ? { scale: 1.08, y: -4 } : {}}
-          whileTap={canDrawDeck ? { scale: 0.95 } : {}}
+          whileTap={canDrawDeck ? { scale: 0.9 } : {}}
           onClick={canDrawDeck ? onDrawDeck : undefined}
         >
           <StackedDecks count={deckCount} cardSize={cardSize} />
@@ -104,15 +107,16 @@ export default function DeckDiscard({
 
       {/* Drawn card (in hand) */}
       {drawnCard && (
-        <div className="flex flex-col items-center gap-2">
+        <div className="flex flex-col items-center gap-1.5">
+          {/* Label: desktop only */}
           <span
-            className="font-bold"
+            className="hidden sm:block font-bold"
             style={{ fontFamily: 'var(--font-game)', fontSize: labelSize, color: '#FFD700', textShadow: '0 1px 6px rgba(0,0,0,0.7)' }}
           >
             En main 🍬
           </span>
           <motion.div
-            style={{ width: cardSize, height: h }}
+            style={{ width: cardSize, height: h, touchAction: 'manipulation' }}
             initial={{ scale: 0, rotate: -15 }}
             animate={{ scale: 1, rotate: 0 }}
             className="relative"
@@ -134,35 +138,49 @@ export default function DeckDiscard({
             />
           </motion.div>
           {canDiscardDrawn && (
-            <button
-              className="btn-candy"
-              style={{ background: 'linear-gradient(135deg, #FF5722, #E91E63)', fontSize: cardSize < 50 ? '0.7rem' : '0.875rem', padding: cardSize < 50 ? '0.25rem 0.7rem' : '0.4rem 1rem' }}
+            <motion.button
+              style={{
+                background: 'linear-gradient(135deg, #FF5722, #E91E63)',
+                border: 'none',
+                borderRadius: 999,
+                cursor: 'pointer',
+                fontFamily: 'var(--font-game)',
+                fontWeight: 700,
+                color: 'white',
+                touchAction: 'manipulation',
+                fontSize: isMobile ? '0.65rem' : '0.875rem',
+                padding: isMobile ? '4px 10px' : '6px 14px',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+                textShadow: '0 1px 3px rgba(0,0,0,0.4)',
+              }}
+              whileTap={{ scale: 0.92 }}
               onClick={onDiscardDrawn}
             >
-              Sur le Plateau !
-            </button>
+              {isMobile ? 'Poser ✕' : 'Sur le Plateau !'}
+            </motion.button>
           )}
         </div>
       )}
 
       {/* Discard pile */}
-      <div className="flex flex-col items-center gap-2">
+      <div className="flex flex-col items-center gap-1.5">
+        {/* Label: desktop only */}
         <span
-          className="font-bold"
+          className="hidden sm:block font-bold"
           style={{
             fontFamily: 'var(--font-game)',
             fontSize: labelSize,
             color: 'white',
-            textShadow: '0 1px 6px rgba(0,0,0,0.7), 0 0 12px rgba(0,0,0,0.5)',
+            textShadow: '0 1px 6px rgba(0,0,0,0.7)',
           }}
         >
           Plateau
         </span>
         <motion.div
           className={`relative ${canDrawDiscard ? 'cursor-pointer' : 'opacity-70'}`}
-          style={{ width: cardSize, height: h }}
-          whileHover={canDrawDiscard ? { scale: 1.1, y: -5 } : {}}
-          whileTap={canDrawDiscard ? { scale: 0.95 } : {}}
+          style={{ width: cardSize, height: h, touchAction: 'manipulation' }}
+          whileHover={canDrawDiscard ? { scale: 1.08, y: -4 } : {}}
+          whileTap={canDrawDiscard ? { scale: 0.9 } : {}}
           onClick={canDrawDiscard ? onDrawDiscard : undefined}
         >
           {topDiscard ? (
@@ -190,7 +208,7 @@ export default function DeckDiscard({
             </>
           ) : (
             <div className="w-full h-full rounded-xl border-2 border-dashed border-white/30 flex items-center justify-center text-white/40" style={{ fontSize: labelSize }}>
-              vide ✨
+              ✨
             </div>
           )}
         </motion.div>

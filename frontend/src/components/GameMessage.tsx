@@ -40,32 +40,45 @@ function resolveStyle(message: string): MessageStyle {
   return { gradient: 'linear-gradient(135deg,rgba(0,0,0,0.55),rgba(0,0,0,0.38))', icon: 'play', border: 'rgba(255,255,255,0.25)' };
 }
 
-export default function GameMessage({ message }: { message: string }) {
+interface GameMessageProps {
+  message: string;
+  /** Compact mode: smaller padding, truncated — used for mobile fixed overlay */
+  compact?: boolean;
+}
+
+export default function GameMessage({ message, compact = false }: GameMessageProps) {
   const { gradient, icon, border } = resolveStyle(message);
 
   return (
     <AnimatePresence mode="wait">
       <motion.div
         key={message}
-        className="flex items-center gap-2 px-4 py-2 rounded-2xl text-white font-bold text-center"
+        className={`flex items-center gap-1.5 rounded-2xl text-white font-bold ${compact ? 'px-3 py-1' : 'px-4 py-2'}`}
         style={{
           background: gradient,
-          backdropFilter: 'blur(10px)',
-          border: `2px solid ${border}`,
+          backdropFilter: 'blur(12px)',
+          border: `1.5px solid ${border}`,
           fontFamily: 'var(--font-game)',
           textShadow: '0 1px 4px rgba(0,0,0,0.55)',
-          fontSize: 'clamp(0.78rem, 2vw, 0.95rem)',
-          boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
-          maxWidth: 'min(90vw, 480px)',
-          lineHeight: 1.35,
+          fontSize: compact ? '0.72rem' : 'clamp(0.78rem, 2vw, 0.95rem)',
+          boxShadow: compact
+            ? '0 4px 16px rgba(0,0,0,0.45)'
+            : '0 4px 20px rgba(0,0,0,0.3)',
+          maxWidth: compact ? 'min(88vw, 340px)' : 'min(90vw, 480px)',
+          lineHeight: 1.3,
+          overflow: 'hidden',
+          whiteSpace: compact ? 'nowrap' : undefined,
+          textOverflow: compact ? 'ellipsis' : undefined,
         }}
-        initial={{ opacity: 0, y: -18, scale: 0.82 }}
+        initial={{ opacity: 0, y: compact ? -8 : -18, scale: 0.88 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
-        exit={{ opacity: 0, y: 10, scale: 0.9 }}
-        transition={{ type: 'spring', stiffness: 400, damping: 28 }}
+        exit={{ opacity: 0, scale: 0.9 }}
+        transition={{ type: 'spring', stiffness: 420, damping: 30 }}
       >
-        <GameIcon name={icon} size={22} style={{ flexShrink: 0 }} />
-        <span>{message}</span>
+        <GameIcon name={icon} size={compact ? 16 : 22} style={{ flexShrink: 0 }} />
+        <span style={{ overflow: 'hidden', textOverflow: compact ? 'ellipsis' : undefined, whiteSpace: compact ? 'nowrap' : undefined }}>
+          {message}
+        </span>
       </motion.div>
     </AnimatePresence>
   );

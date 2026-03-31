@@ -47,22 +47,22 @@ function useCardSizes() {
     if (w >= 640)  return { human: 70, ai: 70, me: 70, deck: 58, showAiLabel: true };
 
     // Mobile — AI gets a fixed compact size, human gets the remaining height.
-    // Logo is hidden on mobile in GameTopBar, so overhead is much smaller.
-    // Overhead: compactTopBar(54) + helpBtn(40) + safeArea(34) + outerPy(8) = 136px
-    // AI board height  = 56 + ai   * 4.05  (label28 + pad16 + 3*cardH + 2*gap6)
-    // Deck zone height = 26 + deck * 1.35  (label18 + gap8 + card)
-    const ai   = w < 400 ? 32 : 36;
+    // Overhead: roundLabel(28) + gap(4) + outerPy(8) = 40px
+    //   (logo hidden, GameMessage is fixed overlay = no layout space)
+    // Cards render at cardSize * 0.9 (−10% breathing room) with gap 8px.
+    // AI board height  = pad(16) + 3*(ai*0.9*1.35) + 2*gap(8) + badge(14) = 30 + ai*3.645 + 16 + 14 = 60 + ai*3.645
+    // Deck zone height = 14 + deck * 1.35  (no labels, reduced padding)
+    const ai   = w < 400 ? 36 : 40;
     const deck = w < 400 ? 40 : 46;
 
-    const aiBoardH  = 56 + ai   * 4.05;
-    const deckZoneH = 26 + deck * 1.35;
-    const overhead  = 136;
+    const aiBoardH  = 60 + ai   * 3.645;
+    const deckZoneH = 14 + deck * 1.35;
+    const overhead  = 40;
 
     const humanAvail = Math.max(0, h - overhead - aiBoardH - deckZoneH);
-    const humanFromH = Math.floor((humanAvail - 56) / 4.05);
-    const humanFromW = w < 400 ? 58 : 68;
-
-    const human = Math.max(40, Math.min(humanFromW, humanFromH));
+    const humanFromH = Math.floor((humanAvail - 60) / 3.645);
+    const humanFromW = w < 400 ? 64 : 76;
+    const human = Math.max(44, Math.min(humanFromW, humanFromH));
 
     return { human, ai, me: human, deck, showAiLabel: false };
   };
@@ -81,14 +81,23 @@ function GameTopBar({ gs }: { gs: GameState }) {
     <motion.div
       style={{
         fontFamily: 'var(--font-game)',
-        fontSize: 'clamp(1rem, 3vw, 1.35rem)',
+        fontSize: 'clamp(1.1rem, 3.5vw, 1.5rem)',
         fontWeight: 900,
         color: '#FFD700',
-        textShadow: '0 0 16px rgba(255,215,0,0.55), 0 2px 6px rgba(0,0,0,0.5)',
-        letterSpacing: '0.03em',
+        // 3D text effect: thick white stroke + layered drop shadows
+        WebkitTextStroke: '1.5px rgba(255,255,255,0.85)',
+        textShadow: [
+          '0 1px 0 #b8860b',
+          '0 2px 0 #a07810',
+          '0 3px 0 #8a6510',
+          '0 4px 0 rgba(0,0,0,0.4)',
+          '0 6px 18px rgba(0,0,0,0.55)',
+          '0 0 20px rgba(255,215,0,0.45)',
+        ].join(', '),
+        letterSpacing: '0.04em',
         whiteSpace: 'nowrap',
       }}
-      animate={{ scale: [1, 1.04, 1] }}
+      animate={{ scale: [1, 1.03, 1] }}
       transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
     >
       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
@@ -101,14 +110,15 @@ function GameTopBar({ gs }: { gs: GameState }) {
 
   return (
     <div className="w-full max-w-6xl flex flex-col items-center gap-1 sm:gap-2">
-      {/* Logo: hidden on mobile to free up vertical space for cards */}
+      {/* Logo: desktop only */}
       <div className="hidden sm:flex w-full justify-center">
         <Logo size="xl" />
       </div>
       <div className="flex justify-center w-full sm:-mt-2">
         {roundLabel}
       </div>
-      <div className="flex justify-center w-full">
+      {/* GameMessage: desktop only — mobile uses a fixed overlay in GameView */}
+      <div className="hidden sm:flex justify-center w-full">
         <GameMessage message={gs.message} />
       </div>
     </div>
@@ -452,6 +462,14 @@ function GameView({
       animate={{ opacity: 1 }}
     >
       <GameTopBar gs={gs} />
+
+      {/* GameMessage: fixed floating toast on mobile — doesn't consume layout height */}
+      <div
+        className="sm:hidden pointer-events-none"
+        style={{ position: 'fixed', top: 36, left: 0, right: 0, zIndex: 45, display: 'flex', justifyContent: 'center', padding: '0 52px 0 12px' }}
+      >
+        <GameMessage message={gs.message} compact />
+      </div>
 
       {/* Settings button — mobile only (hidden sm+) */}
       {!isModalOpen && (

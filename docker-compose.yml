@@ -1,38 +1,17 @@
 services:
-  postgres:
-    image: postgres:16-alpine
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: sugar
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: sugarswap
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    networks:
-      - app
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U sugar -d sugarswap"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
   frontend:
     image: ghcr.io/gassema23/sugarswap-frontend:latest
     restart: unless-stopped
     networks:
       - app
-
   backend:
     image: ghcr.io/gassema23/sugarswap-backend:latest
     restart: unless-stopped
-    depends_on:
-      postgres:
-        condition: service_healthy
     environment:
       PORT: 3001
-      DATABASE_URL: postgresql://sugar:${POSTGRES_PASSWORD}@postgres:5432/sugarswap
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}
       JWT_SECRET: ${JWT_SECRET}
-      JWT_EXPIRES_IN: 7d
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
       GOOGLE_CALLBACK_URL: https://vynia.app/api/auth/google/callback
@@ -42,7 +21,6 @@ services:
       FRONTEND_URL: https://vynia.app
     networks:
       - app
-
   caddy:
     image: caddy:2-alpine
     restart: unless-stopped
@@ -58,12 +36,9 @@ services:
     depends_on:
       - frontend
       - backend
-
 volumes:
-  postgres_data:
   caddy_data:
   caddy_config:
-
 networks:
   app:
     driver: bridge

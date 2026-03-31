@@ -94,21 +94,30 @@ export default function Card({
       initial={{ scale: 0, opacity: 0, y: -80 }}
       animate={{ scale: 1, opacity: 1, y: 0 }}
       transition={{ type: 'spring', stiffness: 260, damping: 22, delay: dealDelay }}
-      whileHover={interactive ? { scale: 1.2, y: -8, zIndex: 50, boxShadow: '0 20px 48px rgba(0,0,0,0.7), 0 0 24px rgba(255,215,0,0.35)' } : {}}
-      whileTap={interactive ? { scale: 0.95 } : {}}
+      whileHover={interactive ? { scale: highlight ? 1.2 : 1.05, y: highlight ? -10 : -5, zIndex: 50, boxShadow: highlight ? '0 24px 56px rgba(0,0,0,0.8), 0 0 32px rgba(255,215,0,0.6)' : '0 16px 40px rgba(0,0,0,0.65), 0 0 20px rgba(255,215,0,0.3)' } : {}}
+      whileTap={interactive ? { scale: highlight ? 0.95 : 0.88 } : {}}
       onClick={interactive ? onClick : undefined}
       className={`relative flip-container ${interactive ? 'cursor-pointer' : ''} ${interactive && !highlight ? 'card-reveal-pulse' : ''}`}
-      style={{ width: size, height: size * 1.35 }}
+      style={{ width: size, height: size * 1.35, touchAction: 'manipulation', zIndex: highlight ? 10 : undefined }}
     >
-      {/* Highlight ring */}
+      {/* Highlight ring — swap target */}
       <AnimatePresence>
         {highlight && (
           <motion.div
-            className="absolute inset-0 rounded-xl pointer-events-none z-10"
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0 }}
-            style={{ boxShadow: '0 0 0 3px #FFD700, 0 0 16px 4px rgba(255,215,0,0.8)' }}
+            className="absolute rounded-xl pointer-events-none"
+            style={{ inset: -3, zIndex: 11 }}
+            initial={{ opacity: 0, scale: 0.88 }}
+            animate={{
+              opacity: 1,
+              scale: 1,
+              boxShadow: [
+                '0 0 0 3px #FFD700, 0 0 20px 6px rgba(255,215,0,0.7)',
+                '0 0 0 3px #FFD700, 0 0 32px 10px rgba(255,215,0,0.95)',
+                '0 0 0 3px #FFD700, 0 0 20px 6px rgba(255,215,0,0.7)',
+              ],
+            }}
+            exit={{ opacity: 0, scale: 0.88 }}
+            transition={{ duration: 0.85, repeat: Infinity, ease: 'easeInOut' }}
           />
         )}
       </AnimatePresence>
