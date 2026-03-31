@@ -55,6 +55,7 @@ type ServerMsg =
   | { type: 'player_joined';       players: string[]; newPlayerName: string; newPlayerIndex: number }
   | { type: 'state_update';        state: GameState }
   | { type: 'player_disconnected'; playerIndex: number }
+  | { type: 'player_reconnected';  playerIndex: number }
   | { type: 'opponent_disconnected' }
   | { type: 'progression_update' } & ProgressionUpdate
   | { type: 'error';               message: string }
@@ -99,6 +100,9 @@ export function useOnlineGame(token: string | null = null) {
   const statusRef       = useRef<OnlineStatus>('idle');
   const sentGameOverRef = useRef(false);
   statusRef.current     = status;
+
+  // Keep myName in a ref for reconnect
+  const myNameRef = useRef('');
 
   // Keep token in a ref so callbacks always see the latest value
   const tokenRef = useRef<string | null>(token);
@@ -183,6 +187,10 @@ export function useOnlineGame(token: string | null = null) {
           setStatus('player_disconnected');
         }
 
+        if (msg.type === 'player_reconnected') {
+          if (statusRef.current === 'player_disconnected') setStatus('playing');
+        }
+
         if (msg.type === 'progression_update') {
           const { type: _t, ...update } = msg;
           setProgressionUpdate(update as ProgressionUpdate);
@@ -199,6 +207,48 @@ export function useOnlineGame(token: string | null = null) {
       };
     });
   }, [myName, setState]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Auto-reconnect on visibility change (mobile background) ─────────────
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState !== 'visible') return;
+      const code = codeRef.current;
+      const idx  = myIdxRef.current;
+      if (statusRef.current !== 'player_disconnected' || !code || idx === null) return;
+
+      const ws = wsRef.current;
+      if (ws && ws.readyState === WebSocket.OPEN) return;
+
+      setStatus('connecting');
+      const newWs = new WebSocket(WS_URL);
+      wsRef.current = newWs;
+
+      newWs.onopen = () => {
+        const { type: _t, ...data } = { type: 'rejoin_room', roomCode: code, playerIndex: idx, token: tokenRef.current };
+        newWs.send(JSON.stringify({ event: 'rejoin_room', data }));
+      };
+      newWs.onerror = () => setStatus('player_disconnected');
+
+      newWs.onmessage = (ev) => {
+        let msg: ServerMsg;
+        try { msg = JSON.parse(ev.data as string); } catch { return; }
+        if (msg.type === 'state_update') {
+          setState(remapIsHuman(msg.state, idx));
+          setStatus('playing');
+        }
+        if (msg.type === 'error') {
+          setStatus('player_disconnected');
+        }
+      };
+
+      newWs.onclose = () => {
+        if (statusRef.current === 'playing') setStatus('player_disconnected');
+      };
+    };
+
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => document.removeEventListener('visibilitychange', handleVisibility);
+  }, [setState]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Host: all players joined → auto-start ────────────────────────────────
   useEffect(() => {
@@ -240,6 +290,7 @@ export function useOnlineGame(token: string | null = null) {
   // ── Public actions ────────────────────────────────────────────────────────
 
   const createRoom = useCallback(async (name: string, max: number = 2) => {
+    myNameRef.current = name;
     setMyName(name);
     setErrorMsg(null);
     maxPlayersRef.current = max;
@@ -250,6 +301,7 @@ export function useOnlineGame(token: string | null = null) {
   }, [connect, wsSend]);
 
   const joinRoom = useCallback(async (code: string, name: string) => {
+    myNameRef.current = name;
     setMyName(name);
     setErrorMsg(null);
     try {

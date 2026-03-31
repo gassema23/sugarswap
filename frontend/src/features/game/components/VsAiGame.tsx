@@ -24,9 +24,11 @@ interface VsAiGameProps {
   names: string[];
   difficulty: AiDifficulty;
   onBackToMenu: () => void;
+  token?: string | null;
+  authUserId?: string | null;
 }
 
-export default function VsAiGame({ names, difficulty, onBackToMenu }: VsAiGameProps) {
+export default function VsAiGame({ names, difficulty, onBackToMenu, token, authUserId }: VsAiGameProps) {
   const {
     gameState, startGame, initialReveal,
     drawDiscard, drawDeck, discardCard,
@@ -34,16 +36,20 @@ export default function VsAiGame({ names, difficulty, onBackToMenu }: VsAiGamePr
   } = useGame();
 
   useSoundEffects(gameState);
-  const sizes        = useCardSizes();
-  const aiTimerRef   = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const sizes            = useCardSizes();
+  const aiTimerRef       = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [showMenu, setShowMenu]       = useState(false);
   const [showEndAnim, setShowEndAnim] = useState(false);
-  const prevPhaseRef = useRef<string | null>(null);
+  const prevPhaseRef     = useRef<string | null>(null);
+  const startedAtRef     = useRef<Date>(new Date());
+  const progressionSent  = useRef(false);
 
   // Start game on mount
   useEffect(() => {
     playGameStart();
     startGame(names);
+    startedAtRef.current    = new Date();
+    progressionSent.current = false;
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ESC key toggles menu
@@ -58,13 +64,37 @@ export default function VsAiGame({ names, difficulty, onBackToMenu }: VsAiGamePr
     return () => window.removeEventListener('keydown', onKey);
   }, [gameState?.phase]);
 
-  // Trigger end-game animation on phase transition to game_over
+  // Trigger end-game animation + submit progression on game_over
   useEffect(() => {
     if (!gameState) return;
     const prev = prevPhaseRef.current;
     prevPhaseRef.current = gameState.phase;
     if (gameState.phase === 'game_over' && prev !== 'game_over') {
       const t = setTimeout(() => setShowEndAnim(true), 0);
+
+      // Submit progression if user is authenticated
+      if (token && authUserId && !progressionSent.current) {
+        progressionSent.current = true;
+        const endedAt = new Date();
+        const winner  = [...gameState.players].sort((a, b) => a.totalScore - b.totalScore)[0];
+        fetch('/api/progression/record', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({
+            points:     gameState.players.find((p) => p.isHuman)?.totalScore ?? 0,
+            startedAt:  startedAtRef.current.toISOString(),
+            endedAt:    endedAt.toISOString(),
+            allPlayers: gameState.players.map((p) => ({
+              userId:   p.isHuman ? authUserId : null,
+              name:     p.name,
+              points:   p.totalScore,
+              isAi:     !p.isHuman,
+              isWinner: p.name === winner?.name,
+            })),
+          }),
+        }).catch(() => { /* silent — progression not critical */ });
+      }
+
       return () => clearTimeout(t);
     }
   }, [gameState?.phase]); // eslint-disable-line react-hooks/exhaustive-deps

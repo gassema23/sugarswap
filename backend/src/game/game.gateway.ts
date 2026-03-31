@@ -11,12 +11,17 @@ import { ProgressionService } from '../progression/progression.service';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
+const RECONNECT_GRACE_MS = 60_000;
+
 interface Room {
   code: string;
-  sockets: WebSocket[];
+  sockets: (WebSocket | null)[];
   names: string[];
   userIds: (string | null)[]; // null = guest
   maxPlayers: number;
+  lastState: unknown | null;
+  startedAt: Date | null;
+  reconnectTimers: (ReturnType<typeof setTimeout> | null)[];
 }
 
 interface PlayerScore {
@@ -31,6 +36,10 @@ interface PlayerScore {
  * Handles room management, state relay, and game-over persistence.
  * Protocol uses `{ type: "event_name", ...data }` messages (matched by
  * the SugarWsAdapter) for full frontend backward-compatibility.
+ *
+ * Reconnection: when a player disconnects mid-game, their slot is held for
+ * RECONNECT_GRACE_MS (30s). If they reconnect and send rejoin_room within
+ * that window, the game resumes from the last known state.
  */
 @WebSocketGateway({ path: '/ws' })
 export class GameGateway implements OnGatewayDisconnect {
@@ -51,10 +60,27 @@ export class GameGateway implements OnGatewayDisconnect {
     if (!room) return;
 
     const idx = room.sockets.indexOf(client);
-    console.log(`[${code}] player #${idx} disconnected`);
-    this.relay(room, client, { type: 'player_disconnected', playerIndex: idx });
-    this.rooms.delete(code);
+    if (idx === -1) return;
+
     this.socketRoom.delete(client);
+
+    // If game hasn't started yet (no lastState), delete room immediately
+    if (!room.lastState) {
+      console.log(`[${code}] player #${idx} disconnected before game start — closing room`);
+      this.relay(room, client, { type: 'player_disconnected', playerIndex: idx });
+      this.rooms.delete(code);
+      return;
+    }
+
+    // Mid-game: hold the slot for RECONNECT_GRACE_MS
+    console.log(`[${code}] player #${idx} disconnected — holding slot for ${RECONNECT_GRACE_MS / 1000}s`);
+    room.sockets[idx] = null;
+    this.relay(room, client, { type: 'player_disconnected', playerIndex: idx });
+
+    room.reconnectTimers[idx] = setTimeout(() => {
+      console.log(`[${code}] player #${idx} reconnect window expired — closing room`);
+      this.rooms.delete(code);
+    }, RECONNECT_GRACE_MS);
   }
 
   // ─── ping ──────────────────────────────────────────────────────────────────
@@ -79,10 +105,13 @@ export class GameGateway implements OnGatewayDisconnect {
 
     const room: Room = {
       code,
-      sockets:    [client],
-      names:      [data.playerName],
-      userIds:    [userId],
+      sockets:         [client],
+      names:           [data.playerName],
+      userIds:         [userId],
       maxPlayers,
+      lastState:       null,
+      startedAt:       null,
+      reconnectTimers: [null],
     };
 
     this.rooms.set(code, room);
@@ -104,7 +133,7 @@ export class GameGateway implements OnGatewayDisconnect {
       this.send(client, { type: 'error', message: 'Ce code ne mène nulle part… vérifie et réessaie ! 🍭' });
       return;
     }
-    if (room.sockets.length >= room.maxPlayers) {
+    if (room.sockets.filter(Boolean).length >= room.maxPlayers) {
       this.send(client, { type: 'error', message: 'Cette île est complète ! Rejoins une autre partie. 🏝️' });
       return;
     }
@@ -115,6 +144,7 @@ export class GameGateway implements OnGatewayDisconnect {
     room.sockets.push(client);
     room.names.push(data.playerName);
     room.userIds.push(userId);
+    room.reconnectTimers.push(null);
     this.socketRoom.set(client, room.code);
 
     this.send(client, {
@@ -126,7 +156,8 @@ export class GameGateway implements OnGatewayDisconnect {
     });
 
     for (let i = 0; i < newPlayerIndex; i++) {
-      this.send(room.sockets[i], {
+      const ws = room.sockets[i];
+      if (ws) this.send(ws, {
         type:           'player_joined',
         players:        room.names,
         newPlayerName:  data.playerName,
@@ -134,7 +165,43 @@ export class GameGateway implements OnGatewayDisconnect {
       });
     }
 
-    console.log(`[${room.code}] "${data.playerName}" joined (${room.sockets.length}/${room.maxPlayers})`);
+    console.log(`[${room.code}] "${data.playerName}" joined (${room.sockets.filter(Boolean).length}/${room.maxPlayers})`);
+  }
+
+  // ─── rejoin_room ───────────────────────────────────────────────────────────
+
+  @SubscribeMessage('rejoin_room')
+  handleRejoinRoom(
+    @MessageBody() data: { roomCode: string; playerIndex: number; token?: string },
+    @ConnectedSocket() client: WebSocket,
+  ) {
+    const room = this.rooms.get(data.roomCode?.toUpperCase?.());
+    if (!room || !room.lastState) {
+      this.send(client, { type: 'error', message: 'La partie a expiré. Lance une nouvelle partie. 🍭' });
+      return;
+    }
+
+    const idx = data.playerIndex;
+    if (idx < 0 || idx >= room.sockets.length || room.sockets[idx] !== null) {
+      this.send(client, { type: 'error', message: 'Ce slot n\'est pas disponible.' });
+      return;
+    }
+
+    // Cancel the grace-period timer
+    const timer = room.reconnectTimers[idx];
+    if (timer) {
+      clearTimeout(timer);
+      room.reconnectTimers[idx] = null;
+    }
+
+    room.sockets[idx] = client;
+    this.socketRoom.set(client, room.code);
+
+    console.log(`[${room.code}] player #${idx} reconnected`);
+
+    // Send current game state so the client can resume
+    this.send(client, { type: 'state_update', state: room.lastState });
+    this.relay(room, client, { type: 'player_reconnected', playerIndex: idx });
   }
 
   // ─── state_update ──────────────────────────────────────────────────────────
@@ -146,19 +213,13 @@ export class GameGateway implements OnGatewayDisconnect {
   ) {
     const room = this.rooms.get(data.roomCode?.toUpperCase?.());
     if (!room) return;
+    if (!room.startedAt) room.startedAt = new Date();
+    room.lastState = data.state;
     this.relay(room, client, { type: 'state_update', state: data.state });
   }
 
   // ─── game_over ─────────────────────────────────────────────────────────────
-  /**
-   * Expected payload:
-   * {
-   *   type: "game_over",
-   *   roomCode: "ABC123",
-   *   scores: [{ playerIndex: 0, points: 42 }, ...],
-   *   token?: "JWT_TOKEN"   // optional — omit for guest players
-   * }
-   */
+
   @SubscribeMessage('game_over')
   async handleGameOver(
     @MessageBody() data: { roomCode: string; scores: PlayerScore[]; token?: string },
@@ -167,35 +228,42 @@ export class GameGateway implements OnGatewayDisconnect {
     const room = this.rooms.get(data.roomCode?.toUpperCase?.());
     if (!room) return;
 
-    // Relay game-over event to all other players
     this.relay(room, client, { type: 'game_over', scores: data.scores });
 
-    // Persist stats for every authenticated player in the room
     const isOnline = room.sockets.length > 1;
     await Promise.all(
       room.sockets.map(async (socket, idx) => {
         const userId = room.userIds[idx];
-        if (!userId) return; // guest — skip persistence
+        if (!userId) return;
 
         const playerScore = data.scores.find((s) => s.playerIndex === idx);
         if (!playerScore) return;
 
         try {
+          const endedAt = new Date();
           const result = await this.progression.recordGameResult({
             userId,
-            points: playerScore.points,
+            points:     playerScore.points,
             isOnline,
+            startedAt:  room.startedAt ?? endedAt,
+            endedAt,
+            allPlayers: room.sockets.map((_, i) => ({
+              userId:   room.userIds[i] ?? null,
+              name:     room.names[i],
+              points:   data.scores.find((s) => s.playerIndex === i)?.points ?? 0,
+              isAi:     false,
+              isWinner: data.scores.reduce((min, s) => s.points < min.points ? s : min, data.scores[0]).playerIndex === i,
+            })),
           });
 
-          // Notify the player of their progression update
-          this.send(socket, {
-            type:         'progression_update',
-            gainedXp:     result.gainedXp,
-            newLevel:     result.newLevel,
-            levelUp:      result.levelUp,
-            newBadges:    result.newBadges,
+          if (socket) this.send(socket, {
+            type:          'progression_update',
+            gainedXp:      result.gainedXp,
+            newLevel:      result.newLevel,
+            levelUp:       result.levelUp,
+            newBadges:     result.newBadges,
             unlockedSkins: result.unlockedSkins,
-            jokers:       result.jokers,
+            jokers:        result.jokers,
           });
         } catch (err) {
           console.error(`[game_over] progression error for user ${userId}:`, err);
@@ -210,9 +278,9 @@ export class GameGateway implements OnGatewayDisconnect {
     if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg));
   }
 
-  private relay(room: Room, sender: WebSocket, msg: object) {
+  private relay(room: Room, sender: WebSocket | null, msg: object) {
     for (const ws of room.sockets) {
-      if (ws !== sender) this.send(ws, msg);
+      if (ws && ws !== sender) this.send(ws, msg);
     }
   }
 
@@ -220,7 +288,6 @@ export class GameGateway implements OnGatewayDisconnect {
     return Math.random().toString(36).substring(2, 8).toUpperCase();
   }
 
-  /** Decode JWT silently — returns userId or null if missing/invalid. */
   private extractUserId(token?: string): string | null {
     if (!token) return null;
     try {

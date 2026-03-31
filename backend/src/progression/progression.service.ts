@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { BadgeType, User } from '@prisma/client';
+import { BadgeType, MatchMode, User } from '@prisma/client';
 
 // ─── Level thresholds ─────────────────────────────────────────────────────────
 
@@ -65,10 +65,21 @@ function evaluateBadges(
 
 // ─── Service ──────────────────────────────────────────────────────────────────
 
+export interface MatchPlayerInput {
+  userId: string | null; // null = AI or guest
+  name: string;
+  points: number;
+  isAi?: boolean;
+  isWinner?: boolean;
+}
+
 export interface GameResultInput {
   userId: string;
   points: number;       // lower is better in Sugar Swap scoring
   isOnline?: boolean;
+  startedAt?: Date;
+  endedAt?: Date;
+  allPlayers?: MatchPlayerInput[]; // full player list for match history
 }
 
 export interface GameResultOutput {
@@ -85,7 +96,7 @@ export class ProgressionService {
   constructor(private readonly prisma: PrismaService) {}
 
   async recordGameResult(input: GameResultInput): Promise<GameResultOutput> {
-    const { userId, points, isOnline = false } = input;
+    const { userId, points, isOnline = false, startedAt, endedAt, allPlayers } = input;
 
     const user = await this.prisma.user.findUniqueOrThrow({
       where: { id: userId },
@@ -133,6 +144,26 @@ export class ProgressionService {
         skipDuplicates: true,
       });
     }
+
+    // Record match history
+    const now = new Date();
+    const players = allPlayers ?? [{ userId, name: '', points, isAi: false, isWinner: true }];
+    await this.prisma.match.create({
+      data: {
+        mode:      isOnline ? MatchMode.ONLINE : MatchMode.VS_AI,
+        startedAt: startedAt ?? now,
+        endedAt:   endedAt   ?? now,
+        players: {
+          create: players.map((p) => ({
+            userId:   p.userId ?? null,
+            name:     p.name,
+            points:   p.points,
+            isAi:     p.isAi     ?? false,
+            isWinner: p.isWinner ?? false,
+          })),
+        },
+      },
+    });
 
     return {
       levelUp,

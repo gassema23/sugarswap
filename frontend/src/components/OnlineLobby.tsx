@@ -227,14 +227,6 @@ export default function OnlineLobby({
         Île en ligne
       </h3>
 
-      <AuthPanel
-        user={authUser}
-        loading={authLoading}
-        onLoginGoogle={onLoginGoogle}
-        onLoginFacebook={onLoginFacebook}
-        onLogout={onLogout}
-      />
-
       {/* Tab selector */}
       <div className="flex gap-2 w-full">
         {(['create', 'join'] as const).map(t => (
@@ -398,7 +390,7 @@ function LobbyWrapper({ children }: { children: React.ReactNode }) {
             'inset 0 1px 0 rgba(255,220,100,0.32)',
             'inset 0 -1px 0 rgba(0,0,0,0.45)',
           ].join(', '),
-          width: 'min(calc(100vw - 32px), 360px)',
+          width: 'min(calc(100vw - 32px), 450px)',
           maxHeight: '82dvh',
           overflowY: 'auto',
           padding: '24px 20px',

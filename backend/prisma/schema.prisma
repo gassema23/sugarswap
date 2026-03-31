@@ -11,19 +11,20 @@ datasource db {
 // ─── User ─────────────────────────────────────────────────────────────────────
 
 model User {
-  id            String   @id @default(cuid())
+  id            String        @id @default(cuid())
   socialId      String
-  provider      String   // "google" | "facebook"
+  provider      String        // "google" | "facebook"
   name          String
   avatar        String?
-  level         Int      @default(1)
-  experience    Int      @default(0)
-  totalMatches  Int      @default(0)
-  totalPoints   Int      @default(0)
-  unlockedSkins String[] @default([])
+  level         Int           @default(1)
+  experience    Int           @default(0)
+  totalMatches  Int           @default(0)
+  totalPoints   Int           @default(0)
+  unlockedSkins String[]      @default([])
   badges        Badge[]
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  matchPlayers  MatchPlayer[]
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
 
   @@unique([socialId, provider])
   @@index([totalMatches])
@@ -32,14 +33,47 @@ model User {
 // ─── Badge ────────────────────────────────────────────────────────────────────
 
 model Badge {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   type      BadgeType
-  awardedAt DateTime @default(now())
+  awardedAt DateTime  @default(now())
 
   @@unique([userId, type])
   @@index([userId])
+}
+
+// ─── Match ────────────────────────────────────────────────────────────────────
+
+model Match {
+  id        String        @id @default(cuid())
+  mode      MatchMode
+  startedAt DateTime
+  endedAt   DateTime
+  players   MatchPlayer[]
+  createdAt DateTime      @default(now())
+}
+
+model MatchPlayer {
+  id       String  @id @default(cuid())
+  matchId  String
+  match    Match   @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  userId   String? // null = guest or AI
+  user     User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+  name     String  // display name at time of game
+  points   Int
+  isAi     Boolean @default(false)
+  isWinner Boolean @default(false)
+
+  @@index([matchId])
+  @@index([userId])
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum MatchMode {
+  VS_AI
+  ONLINE
 }
 
 enum BadgeType {
