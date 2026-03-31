@@ -1,13 +1,10 @@
 vynia.app {
-    # WebSocket relay — explicit upgrade matcher, must come before all other routes
-    @ws {
-        path /ws
-        header Connection *Upgrade*
-        header Upgrade websocket
-    }
-    reverse_proxy @ws backend:3001 {
-        transport http {
-            versions 1.1
+    # WebSocket relay — path-only match, works with both HTTP/1.1 and HTTP/2 (Cloudflare)
+    handle /ws {
+        reverse_proxy backend:3001 {
+            transport http {
+                versions 1.1
+            }
         }
     }
 
