@@ -1,7 +1,14 @@
 vynia.app {
-    # WebSocket relay — must be matched before /api catch-all
-    handle /ws {
-        reverse_proxy backend:3001
+    # WebSocket relay — explicit upgrade matcher, must come before all other routes
+    @ws {
+        path /ws
+        header Connection *Upgrade*
+        header Upgrade websocket
+    }
+    reverse_proxy @ws backend:3001 {
+        transport http {
+            versions 1.1
+        }
     }
 
     # REST API (NestJS, prefix /api)

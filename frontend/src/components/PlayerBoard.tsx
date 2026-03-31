@@ -52,38 +52,80 @@ export default function PlayerBoard({
 
   return (
     <div className="flex flex-col items-center gap-2">
-      {/* Player label */}
-      {showLabel && <motion.div
-        className="flex items-center gap-2 px-4 py-1 rounded-full text-white font-bold"
-        style={{
-          background: isActive
-            ? 'linear-gradient(135deg, #E91E63, #FF5722)'
-            : 'rgba(0,0,0,0.3)',
-          border: isActive ? '2px solid #FFD700' : '2px solid rgba(255,255,255,0.2)',
-          textShadow: '0 1px 3px rgba(0,0,0,0.5)',
-          fontFamily: 'var(--font-game)',
-          backdropFilter: 'blur(6px)',
-        }}
-        animate={isActive ? { scale: [1, 1.04, 1] } : { scale: 1 }}
-        transition={{ duration: 1.2, repeat: isActive ? Infinity : 0 }}
-      >
-        {isActive && (
-          <motion.span
-            style={{ display: 'inline-flex' }}
-            animate={{ rotate: 360 }}
-            transition={{ duration: 1.5, repeat: Infinity, ease: 'linear' }}
+      {/* Compact score badge row — name left, score right */}
+      {showLabel && (
+        <div className="flex items-center justify-between w-full px-1">
+          {/* Name pill */}
+          <motion.div
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-full"
+            style={{
+              background: isActive
+                ? 'linear-gradient(135deg, #E91E63, #FF5722)'
+                : 'rgba(0,0,0,0.35)',
+              border: isActive ? '1.5px solid #FFD700' : '1.5px solid rgba(255,255,255,0.18)',
+              fontFamily: 'var(--font-game)',
+              fontSize: '0.78rem',
+              fontWeight: 700,
+              color: 'white',
+              textShadow: '0 1px 3px rgba(0,0,0,0.5)',
+              backdropFilter: 'blur(6px)',
+              maxWidth: '55%',
+              overflow: 'hidden',
+              whiteSpace: 'nowrap',
+              textOverflow: 'ellipsis',
+            }}
+            animate={isActive ? { scale: [1, 1.04, 1] } : { scale: 1 }}
+            transition={{ duration: 1.2, repeat: isActive ? Infinity : 0 }}
           >
-            <GameIcon name="fruit" size={16} />
-          </motion.span>
-        )}
-        <span>{player.name}</span>
-        <span
-          className="text-sm px-2 py-0.5 rounded-full"
-          style={{ background: 'rgba(255,255,255,0.2)' }}
-        >
-          {score} pts
-        </span>
-      </motion.div>}
+            {isActive
+              ? (
+                <motion.span
+                  style={{ display: 'inline-flex', flexShrink: 0 }}
+                  animate={{ rotate: 360 }}
+                  transition={{ duration: 1.5, repeat: Infinity, ease: 'linear' }}
+                >
+                  <GameIcon name="fruit" size={13} />
+                </motion.span>
+              )
+              : <GameIcon name="fruit" size={13} style={{ opacity: 0.5, flexShrink: 0 }} />
+            }
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{player.name}</span>
+          </motion.div>
+
+          {/* Score badge */}
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              background: isActive
+                ? 'linear-gradient(135deg, rgba(255,215,0,0.25), rgba(255,100,0,0.25))'
+                : 'rgba(0,0,0,0.35)',
+              border: isActive ? '1.5px solid rgba(255,215,0,0.7)' : '1.5px solid rgba(255,255,255,0.18)',
+              borderRadius: 12,
+              padding: '2px 10px',
+              backdropFilter: 'blur(6px)',
+              minWidth: 52,
+              textAlign: 'center',
+            }}
+          >
+            <span style={{
+              fontFamily: 'var(--font-game)',
+              fontSize: '1.25rem',
+              fontWeight: 900,
+              color: isActive ? '#FFD700' : 'white',
+              lineHeight: 1.1,
+              textShadow: isActive ? '0 0 8px rgba(255,215,0,0.5)' : '0 1px 3px rgba(0,0,0,0.5)',
+            }}>
+              {score}
+            </span>
+            <span style={{ fontSize: '0.55rem', color: 'rgba(255,255,255,0.55)', fontFamily: 'var(--font-game)', lineHeight: 1 }}>
+              pépites
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* Grid */}
       <div

@@ -68,7 +68,7 @@ function ColumnCombo() {
     <div className="flex gap-4 items-start justify-center flex-wrap">
       {/* Before: 3 identical cards in a column */}
       <div className="flex flex-col items-center gap-1">
-        <span style={{ fontSize: '0.65rem', color: 'rgba(0,0,0,0.45)', fontFamily: 'var(--font-game)' }}>Avant</span>
+        <span style={{ fontSize: '0.65rem', color: 'rgba(0,0,0,0.45)', fontFamily: 'var(--font-game)' }}>Avant 🍬</span>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 36px)', gap: 4 }}>
           {([0, 3, 7, -1, 3, 5, 11, -1, 3, 8, 2, -1] as CardValue[]).map((v, i) =>
             v === -1
@@ -89,7 +89,7 @@ function ColumnCombo() {
 
       {/* After: column gone */}
       <div className="flex flex-col items-center gap-1">
-        <span style={{ fontSize: '0.65rem', color: 'rgba(0,0,0,0.45)', fontFamily: 'var(--font-game)' }}>Après</span>
+        <span style={{ fontSize: '0.65rem', color: 'rgba(0,0,0,0.45)', fontFamily: 'var(--font-game)' }}>Après ✨</span>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 36px)', gap: 4 }}>
           {([0, 3, 7, null, null, 5, 11, null, null, 8, 2, null] as (CardValue | null)[]).map((v, i) =>
             v === null ? (
@@ -261,7 +261,7 @@ export default function RulesModal({ isOpen, onClose }: Props) {
                   Règles de Sugar Swap
                 </h2>
                 <p style={{ fontFamily: 'var(--font-game)', fontSize: '0.8rem', color: '#888', margin: 0 }}>
-                  Basé sur les règles du Skyjo
+                  Inspiré du Skyjo — version sucrée 🍭
                 </p>
               </div>
 
@@ -270,8 +270,8 @@ export default function RulesModal({ isOpen, onClose }: Props) {
 
                 {/* Objectif */}
                 <Section icon="hammer" title="Objectif" color="#FF9800">
-                  Obtenez le <strong>score le plus bas</strong> pour remporter la friandise !
-                  La partie se termine quand un joueur dépasse <strong>100 points</strong> au total.
+                  Viser le <strong>moins de pépites</strong> pour remporter la friandise !
+                  La partie s&apos;arrête quand un joueur dépasse <strong>100 pépites</strong> au total.
                   <div className="flex items-center gap-2 mt-2 flex-wrap">
                     {([-2, -1, 0, 3, 7, 12] as CardValue[]).map(v => (
                       <MiniCard key={v} value={v} size={36} />
@@ -282,7 +282,7 @@ export default function RulesModal({ isOpen, onClose }: Props) {
 
                 {/* Mise en place */}
                 <Section icon="play" title="Mise en place" color="#4CAF50">
-                  Chaque joueur reçoit <strong>12 cartes</strong> face cachée, disposées en grille{' '}
+                  Chaque joueur reçoit <strong>12 cartes</strong> bien emballées, en grille{' '}
                   <strong>4 colonnes × 3 lignes</strong>.
                   <div className="mt-2 flex items-center gap-2 flex-wrap">
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 30px)', gap: 3 }}>
@@ -291,8 +291,8 @@ export default function RulesModal({ isOpen, onClose }: Props) {
                       ))}
                     </div>
                     <span style={{ fontSize: '0.75rem', color: '#888' }}>
-                      Retournez ensuite <strong>2 cartes</strong> de votre choix.
-                      Le joueur avec la somme la plus haute commence.
+                      Ensuite, <strong>déballez 2 cartes</strong> au choix.
+                      Celui qui a la somme la plus haute ouvre le bal !
                     </span>
                   </div>
                 </Section>
@@ -309,9 +309,9 @@ export default function RulesModal({ isOpen, onClose }: Props) {
                         }}
                       >1</span>
                       <span>
-                        <strong>Piocher</strong> : prenez la carte visible de la{' '}
-                        <strong style={{ color: '#E91E63' }}>défausse</strong> (échange obligatoire)
-                        ou une carte cachée de la <strong style={{ color: '#4CAF50' }}>pioche</strong>.
+                        <strong>Récolter</strong> : prenez la carte visible du{' '}
+                        <strong style={{ color: '#E91E63' }}>Plateau</strong> (swap obligatoire)
+                        ou une carte cachée du <strong style={{ color: '#4CAF50' }}>Paquet</strong>.
                       </span>
                     </div>
                     <div className="flex items-start gap-2">
@@ -323,28 +323,27 @@ export default function RulesModal({ isOpen, onClose }: Props) {
                         }}
                       >2</span>
                       <span>
-                        Si piochée du deck : <strong>échangez</strong> la avec une carte de votre grille,
-                        ou <strong>défaussez-la</strong> et retournez une carte cachée.
+                        Si la carte vient du Paquet : <strong>swappez</strong> avec une case de votre îlot,
+                        ou posez-la sur le <strong>Plateau</strong> puis <strong>déballez</strong> une carte cachée.
                       </span>
                     </div>
                   </div>
                 </Section>
 
                 {/* Règle d'or */}
-                <Section icon="fruit" title="La Règle d'Or — Combo Colonne !" color="#E91E63">
+                <Section icon="fruit" title="Combo Sucré !" color="#E91E63">
                   <p style={{ margin: '0 0 10px' }}>
-                    Si vous avez <strong>3 cartes identiques</strong> dans une même colonne verticale —
-                    elles disparaissent ! Ces 3 cartes valent <strong>0 point</strong>.
-                    Même des <strong style={{ color: '#7B0000' }}>12</strong> peuvent disparaître !
+                    <strong>3 cartes identiques</strong> dans une même colonne — <strong>POP !</strong> Colonne effacée ! ✨
+                    Ces 3 cartes valent <strong>0 pépites</strong>.
+                    Même un <strong style={{ color: '#7B0000' }}>12</strong> peut fondre comme une meringue !
                   </p>
                   <ColumnCombo />
                 </Section>
 
                 {/* Fin de manche */}
                 <Section icon="fruit" title="Fin de manche" color="#9C27B0">
-                  La manche s'arrête quand un joueur révèle sa{' '}
-                  <strong>12ème carte</strong>. Les autres joueurs ont encore{' '}
-                  <strong>un dernier tour</strong>.
+                  La manche s&apos;arrête quand un joueur a tout <strong>déballé</strong> (12 cartes visibles).
+                  Les autres ont encore <strong>un dernier tour</strong> pour briller ! 🏝️
                 </Section>
 
                 {/* Doublement */}
@@ -369,16 +368,15 @@ export default function RulesModal({ isOpen, onClose }: Props) {
                       fontFamily: 'var(--font-game)', fontSize: '0.95rem',
                       fontWeight: 700, color: '#E65100',
                     }}>
-                      Attention — Score Doublé !
+                      Aïe ! Pépites doublées ! 🍬x2
                     </span>
                   </div>
                   <p style={{ fontFamily: 'var(--font-game)', fontSize: '0.82rem', color: '#555', lineHeight: 1.55, margin: 0 }}>
-                    Si vous terminez la manche mais que vous n'avez{' '}
-                    <strong>pas strictement le plus petit score</strong>,{' '}
-                    vos points pour cette manche sont <strong style={{ color: '#E91E63' }}>doublés</strong> !
+                    Si tu finis la manche sans avoir <strong>strictement le moins de pépites</strong>,{' '}
+                    tes pépites de la manche sont <strong style={{ color: '#E91E63' }}>doublées</strong> !
                     <br />
                     <span style={{ color: '#888', fontSize: '0.75rem' }}>
-                      (Exception : score négatif ou nul → pas de doublement)
+                      (Exception : pépites négatives ou nulles → pas de doublement)
                     </span>
                   </p>
                   <div className="flex items-center gap-3 mt-3 justify-center flex-wrap">
@@ -386,14 +384,14 @@ export default function RulesModal({ isOpen, onClose }: Props) {
                       <div className="flex gap-1">
                         {([5, 3, -1, 2] as CardValue[]).map((v, i) => <MiniCard key={i} value={v} size={30} />)}
                       </div>
-                      <span style={{ fontSize: '0.65rem', color: '#888' }}>Tu finis : 9 pts</span>
+                      <span style={{ fontSize: '0.65rem', color: '#888' }}>Tu finis : 9 pépites</span>
                     </div>
                     <span style={{ fontSize: '1.2rem' }}>vs</span>
                     <div className="flex flex-col items-center gap-1">
                       <div className="flex gap-1">
                         {([4, 4, 0, 0] as CardValue[]).map((v, i) => <MiniCard key={i} value={v} size={30} />)}
                       </div>
-                      <span style={{ fontSize: '0.65rem', color: '#888' }}>Adversaire : 8 pts</span>
+                      <span style={{ fontSize: '0.65rem', color: '#888' }}>Adversaire : 8 pépites</span>
                     </div>
                     <div
                       style={{
@@ -407,13 +405,13 @@ export default function RulesModal({ isOpen, onClose }: Props) {
                         border: '2px solid #FFD700',
                       }}
                     >
-                      9 × 2 = 18 pts
+                      9 × 2 = 18 pépites
                     </div>
                   </div>
                 </div>
 
                 {/* Composition du deck */}
-                <Section icon="bookPurple" title="Composition du deck (150 cartes)" color="#607D8B">
+                <Section icon="bookPurple" title="Dans le Paquet (150 cartes)" color="#607D8B">
                   <div className="flex flex-wrap gap-2 mt-1 items-center">
                     {([
                       { v: -2, count: 5 }, { v: -1, count: 10 }, { v: 0, count: 15 },
@@ -445,7 +443,7 @@ export default function RulesModal({ isOpen, onClose }: Props) {
                   whileTap={{ scale: 0.96 }}
                   onClick={onClose}
                 >
-                  À moi de jouer !
+                  C&apos;est parti, je joue ! 🍭
                 </motion.button>
               </div>
             </div>

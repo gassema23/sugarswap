@@ -20,6 +20,9 @@ export interface Player {
   totalScore: number;
 }
 
+// ─── AI Difficulty ────────────────────────────────────────────────────────────
+export type AiDifficulty = 'easy' | 'medium' | 'expert';
+
 // ─── Game phases ──────────────────────────────────────────────────────────────
 export type GamePhase =
   | 'setup'           // First-time setup (dealing)

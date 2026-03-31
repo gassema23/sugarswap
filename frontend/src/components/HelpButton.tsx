@@ -18,8 +18,8 @@ function getHelp(
   if (gamePhase === 'initial_reveal') {
     return {
       icon: 'bookPink',
-      title: 'Révèle 2 cartes',
-      desc: 'Clique sur 2 cartes de ton plateau pour les retourner. Ce sont tes indices de départ !',
+      title: 'Déballe 2 cartes !',
+      desc: 'Touche 2 cases de ton îlot pour les déballer — ce sont tes premières douceurs ! 🍬',
       gradient: 'linear-gradient(135deg, #FF9800 0%, #FF5722 100%)',
     };
   }
@@ -28,7 +28,7 @@ function getHelp(
     return {
       icon: 'fruit',
       title: 'Fin de manche',
-      desc: 'Consulte les scores puis clique sur "Nouvelle manche" pour continuer la partie.',
+      desc: 'Admire les pépites puis lance la manche suivante pour continuer la gourmandise ! ✨',
       gradient: 'linear-gradient(135deg, #FFD700 0%, #FF9800 100%)',
     };
   }
@@ -36,8 +36,8 @@ function getHelp(
   if (gamePhase === 'game_over') {
     return {
       icon: 'hammer',
-      title: 'Partie terminée !',
-      desc: 'Le joueur avec le score le plus bas gagne. Clique sur "Nouvelle partie" pour rejouer.',
+      title: 'La fête est finie !',
+      desc: 'Moins de pépites = plus de brillance ! Touche « Nouvelle gourmandise » pour rejouer. 🍭',
       gradient: 'linear-gradient(135deg, #4CAF50 0%, #1B5E20 100%)',
     };
   }
@@ -45,8 +45,8 @@ function getHelp(
   if (!isHumanTurn) {
     return {
       icon: 'key',
-      title: "Tour adverse",
-      desc: "L'adversaire réfléchit à son coup. Attends ton tour pour jouer !",
+      title: 'Un autre chef joue',
+      desc: 'Patience… le sucre mijote côté plateau. Ton tour arrive ! 🏝️',
       gradient: 'linear-gradient(135deg, #9C27B0 0%, #4A148C 100%)',
     };
   }
@@ -54,8 +54,8 @@ function getHelp(
   if (turnPhase === 'draw') {
     return {
       icon: 'play',
-      title: 'Pioche une carte',
-      desc: 'Clique sur la Pioche (face cachée) pour une surprise, ou prends la carte visible de la Défausse si elle t\'intéresse.',
+      title: 'Récolte une carte !',
+      desc: 'Touche le Paquet pour une surprise, ou pique la carte visible du Plateau si elle te fait de l’œil. 🍌',
       gradient: 'linear-gradient(135deg, #03A9F4 0%, #01579B 100%)',
     };
   }
@@ -64,8 +64,8 @@ function getHelp(
     if (hasDrawnCard) {
       return {
         icon: 'hammer',
-        title: 'Échange ou défausse',
-        desc: 'Clique sur une carte de TON plateau pour l\'échanger avec celle en main. Ou clique "Défausser" pour la jeter et révéler une carte cachée.',
+        title: 'Swap ou pose !',
+        desc: 'Touche une case de ton îlot pour swapper… ou « Sur le Plateau ! » pour déballer une carte cachée ensuite.',
         gradient: 'linear-gradient(135deg, #E91E63 0%, #880E4F 100%)',
       };
     }
@@ -74,8 +74,8 @@ function getHelp(
   if (turnPhase === 'reveal_hidden') {
     return {
       icon: 'fruit',
-      title: 'Révèle une carte !',
-      desc: 'Super ! Maintenant clique sur une carte face cachée (dos rayé bleu/blanc) de ton plateau pour la retourner.',
+      title: 'Déballe une carte !',
+      desc: 'Choisis encore une case face cachée sur ton îlot — c’est le moment de briller ! ✨',
       gradient: 'linear-gradient(135deg, #4CAF50 0%, #1B5E20 100%)',
     };
   }
@@ -83,7 +83,7 @@ function getHelp(
   return {
     icon: 'play',
     title: 'Sugar Swap',
-    desc: 'Objectif : avoir le score le plus bas ! Retourne toutes tes cartes le premier pour déclencher la fin de manche.',
+    desc: 'Objectif : le moins de pépites possible ! Déballe tout le premier pour déclencher la fin de manche.',
     gradient: 'linear-gradient(135deg, #E91E63 0%, #FF9800 100%)',
   };
 }

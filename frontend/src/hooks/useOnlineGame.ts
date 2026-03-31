@@ -132,7 +132,7 @@ export function useOnlineGame(token: string | null = null) {
       ws.onopen = () => resolve(ws);
       ws.onerror = () => {
         setStatus('error');
-        setErrorMsg('Impossible de se connecter au serveur.');
+        setErrorMsg('Oups ! Le serveur fait la sieste — réessaie dans un instant. 🏝️');
         reject(new Error('WS connect failed'));
       };
 

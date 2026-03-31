@@ -15,6 +15,8 @@ import OnlineLobby from './components/OnlineLobby';
 import RulesModal from './components/RulesModal';
 import GameIcon from './components/GameIcon';
 import ProgressionToast from './components/ProgressionToast';
+import EndGameAnimation from './components/EndGameAnimation';
+import type { AiDifficulty } from './engine/types';
 import {
   playButtonClick,
   playDrawDeck,
@@ -40,23 +42,29 @@ function useCardSizes() {
     const w = window.innerWidth;
     const h = window.innerHeight;
 
-    // Desktop / tablet — width drives sizing, height not a concern
-    if (w >= 1024) return { human: 80, me: 80, deck: 68, showAiLabel: true };
-    if (w >= 640)  return { human: 70, me: 70, deck: 58, showAiLabel: true };
+    // Desktop / tablet
+    if (w >= 1024) return { human: 80, ai: 80, me: 80, deck: 68, showAiLabel: true };
+    if (w >= 640)  return { human: 70, ai: 70, me: 70, deck: 58, showAiLabel: true };
 
-    // Mobile (flex-col): both boards + deck must fit in viewport height.
-    // Overhead: topBar(~90px logo+round+msg) + helpBtn(~44px) + outer py/gap(~28px) + inner row gaps(~24px) + deck(~100px) = ~286px
-    const boardsAvail = Math.max(0, h - 286);
-    // Per board: label(34px) + grid-padding(16px) + inner-gaps(12px) + cardH*3
-    //   cardH = cardW * 1.35  →  board = 62 + cardW * 4.05
-    // 2 boards total: 2*(62 + cardW*4.05)  →  cardW = (boardsAvail/2 - 62) / 4.05
-    const maxFromH  = Math.floor((boardsAvail / 2 - 62) / 4.05);
-    const maxFromW  = w < 400 ? 42 : 50;
+    // Mobile — AI gets a fixed compact size, human gets the remaining height.
+    // Logo is hidden on mobile in GameTopBar, so overhead is much smaller.
+    // Overhead: compactTopBar(54) + helpBtn(40) + safeArea(34) + outerPy(8) = 136px
+    // AI board height  = 56 + ai   * 4.05  (label28 + pad16 + 3*cardH + 2*gap6)
+    // Deck zone height = 26 + deck * 1.35  (label18 + gap8 + card)
+    const ai   = w < 400 ? 32 : 36;
+    const deck = w < 400 ? 40 : 46;
 
-    const human = Math.max(28, Math.min(maxFromW, maxFromH));
-    const deck  = Math.max(26, Math.min(w < 400 ? 38 : 44, Math.floor(maxFromH * 0.9)));
+    const aiBoardH  = 56 + ai   * 4.05;
+    const deckZoneH = 26 + deck * 1.35;
+    const overhead  = 136;
 
-    return { human, me: human, deck, showAiLabel: false };
+    const humanAvail = Math.max(0, h - overhead - aiBoardH - deckZoneH);
+    const humanFromH = Math.floor((humanAvail - 56) / 4.05);
+    const humanFromW = w < 400 ? 58 : 68;
+
+    const human = Math.max(40, Math.min(humanFromW, humanFromH));
+
+    return { human, ai, me: human, deck, showAiLabel: false };
   };
   const [sizes, setSizes] = useState(get);
   useEffect(() => {
@@ -85,7 +93,7 @@ function GameTopBar({ gs }: { gs: GameState }) {
     >
       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
         <GameIcon name="fruit" size={18} />
-        Manche {gs.roundNumber}
+        Manche {gs.roundNumber} ✨
         <GameIcon name="fruit" size={18} />
       </span>
     </motion.div>
@@ -93,8 +101,11 @@ function GameTopBar({ gs }: { gs: GameState }) {
 
   return (
     <div className="w-full max-w-6xl flex flex-col items-center gap-1 sm:gap-2">
-      <Logo size="xl" />
-      <div className="flex justify-center w-full -mt-1 sm:-mt-2">
+      {/* Logo: hidden on mobile to free up vertical space for cards */}
+      <div className="hidden sm:flex w-full justify-center">
+        <Logo size="xl" />
+      </div>
+      <div className="flex justify-center w-full sm:-mt-2">
         {roundLabel}
       </div>
       <div className="flex justify-center w-full">
@@ -122,7 +133,7 @@ function useSoundEffects(gameState: GameState | null) {
     // Phase change
     if (phase !== prevPhaseRef.current) {
       if (phase === 'round_end') {
-        if (message.includes('DOUBLÉ')) {
+        if (message.toLowerCase().includes('doublé')) {
           setTimeout(playScoreDoubled, 600);
         } else {
           playRoundEnd();
@@ -164,7 +175,7 @@ function ModeMenu({ onSelect, onRules }: { onSelect: (m: AppMode) => void; onRul
           backdropFilter: 'blur(24px)',
           border: '2px solid rgba(255,205,0,0.65)',
           boxShadow: '0 0 0 1px rgba(160,90,0,0.38), 0 0 55px rgba(160,60,255,0.12), 0 26px 70px rgba(0,0,0,0.72), inset 0 1px 0 rgba(255,220,100,0.32), inset 0 -1px 0 rgba(0,0,0,0.45)',
-          width: 'min(calc(100vw - 32px), 320px)',
+          width: 'min(calc(100vw - 32px), 360px)',
           padding: '28px 22px',
         }}
       >
@@ -179,7 +190,7 @@ function ModeMenu({ onSelect, onRules }: { onSelect: (m: AppMode) => void; onRul
           backgroundClip: 'text',
           filter: 'drop-shadow(0 1px 8px rgba(255,170,0,0.55))',
         }}>
-          Comment jouer ?
+          Prêt pour une dose de sucre ?
         </h2>
 
         <button
@@ -201,7 +212,7 @@ function ModeMenu({ onSelect, onRules }: { onSelect: (m: AppMode) => void; onRul
             <line x1="4" y1="13" x2="2" y2="13" stroke="white" strokeWidth="1.8" strokeLinecap="round"/>
             <line x1="20" y1="13" x2="22" y2="13" stroke="white" strokeWidth="1.8" strokeLinecap="round"/>
           </svg>
-          Contre l&apos;IA
+          Solo vs l&apos;IA sucrée 🍭
         </button>
 
         <button
@@ -219,7 +230,7 @@ function ModeMenu({ onSelect, onRules }: { onSelect: (m: AppMode) => void; onRul
             <line x1="3" y1="9" x2="21" y2="9" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
             <line x1="3" y1="15" x2="21" y2="15" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
           </svg>
-          En ligne (2–8 joueurs)
+          Île en ligne (2–8 joueurs) 🏝️
         </button>
 
         <button
@@ -238,17 +249,26 @@ function ModeMenu({ onSelect, onRules }: { onSelect: (m: AppMode) => void; onRul
             <line x1="8" y1="9" x2="15" y2="9" stroke="white" strokeWidth="1.8" strokeLinecap="round"/>
             <line x1="8" y1="12.5" x2="13" y2="12.5" stroke="white" strokeWidth="1.8" strokeLinecap="round"/>
           </svg>
-          Règles
+          Les règles du trip 📖
         </button>
       </div>
     </motion.div>
   );
 }
 
+// ─── Difficulty config ────────────────────────────────────────────────────────
+const DIFFICULTY_CONFIG: Record<AiDifficulty, { label: string; emoji: string; desc: string; gradient: string }> = {
+  easy:   { label: 'Facile',  emoji: '🍬', desc: 'L\'IA fait des erreurs',     gradient: 'linear-gradient(135deg, #4CAF50 0%, #8BC34A 100%)' },
+  medium: { label: 'Moyen',   emoji: '🍭', desc: 'IA équilibrée',              gradient: 'linear-gradient(135deg, #FF9800 0%, #E91E63 100%)' },
+  expert: { label: 'Expert',  emoji: '🏆', desc: 'IA redoutable !',            gradient: 'linear-gradient(135deg, #7B1FA2 0%, #E91E63 100%)' },
+};
+
 // ─── VS AI setup screen ───────────────────────────────────────────────────────
-function VsAiSetup({ onStart }: { onStart: (names: string[]) => void }) {
-  const [p1, setP1] = useState('Joueur 1');
+function VsAiSetup({ onStart, onBack }: { onStart: (names: string[], difficulty: AiDifficulty) => void; onBack: () => void }) {
+  const [p1, setP1] = useState('Gourmand');
   const [p2, setP2] = useState('IA Sucrée');
+  const [difficulty, setDifficulty] = useState<AiDifficulty>('medium');
+
   const inputStyle: React.CSSProperties = {
     fontFamily: 'var(--font-game)',
     background: 'rgba(255,255,255,0.22)',
@@ -269,38 +289,100 @@ function VsAiSetup({ onStart }: { onStart: (names: string[]) => void }) {
       animate={{ opacity: 1, scale: 1 }}
       transition={{ type: 'spring', stiffness: 220, damping: 20 }}
     >
-      <Logo size="md" />
+      <Logo size="lg" />
       <div
-        className="flex flex-col gap-3 p-6 rounded-2xl items-center"
+        className="flex flex-col gap-3 rounded-3xl items-center"
         style={{
-          background: 'rgba(0,0,0,0.38)',
-          backdropFilter: 'blur(14px)',
-          border: '2px solid rgba(255,215,0,0.35)',
-          boxShadow: '0 8px 40px rgba(0,0,0,0.3)',
-          width: 'min(calc(100vw - 32px), 310px)',
+          background: [
+            'radial-gradient(ellipse at 20% 20%, rgba(180,50,255,0.08) 0%, transparent 60%)',
+            'radial-gradient(ellipse at 80% 80%, rgba(255,100,50,0.06) 0%, transparent 60%)',
+            'linear-gradient(165deg, rgba(28,8,68,0.97) 0%, rgba(10,4,30,0.99) 100%)',
+          ].join(', '),
+          backdropFilter: 'blur(24px)',
+          border: '2px solid rgba(255,205,0,0.65)',
+          boxShadow: [
+            '0 0 0 1px rgba(160,90,0,0.38)',
+            '0 0 55px rgba(160,60,255,0.12)',
+            '0 26px 70px rgba(0,0,0,0.72)',
+            'inset 0 1px 0 rgba(255,220,100,0.32)',
+            'inset 0 -1px 0 rgba(0,0,0,0.45)',
+          ].join(', '),
+          width: 'min(calc(100vw - 32px), 360px)',
+          padding: '24px 20px',
           fontFamily: 'var(--font-game)',
         }}
       >
         <h2 style={{ color: '#FFD700', margin: 0, fontSize: '1.2rem', textShadow: '0 0 10px rgba(255,215,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
           <GameIcon name="robot" size={26} />
-          Contre l&apos;IA
+          Solo vs l&apos;IA sucrée
         </h2>
+
+        {/* Difficulty selector */}
+        <div className="flex flex-col gap-1.5 w-full">
+          <label style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.75rem' }}>Niveau de difficulté</label>
+          <div className="flex gap-2 w-full">
+            {(Object.entries(DIFFICULTY_CONFIG) as [AiDifficulty, typeof DIFFICULTY_CONFIG[AiDifficulty]][]).map(([key, cfg]) => {
+              const isSelected = difficulty === key;
+              return (
+                <motion.button
+                  key={key}
+                  type="button"
+                  onClick={() => { playButtonClick(); setDifficulty(key); }}
+                  style={{
+                    flex: 1,
+                    fontFamily: 'var(--font-game)',
+                    background: isSelected ? cfg.gradient : 'rgba(255,255,255,0.07)',
+                    border: isSelected ? '2px solid rgba(255,255,255,0.5)' : '2px solid rgba(255,255,255,0.15)',
+                    borderRadius: 12,
+                    padding: '8px 4px',
+                    cursor: 'pointer',
+                    color: 'white',
+                    textAlign: 'center',
+                    fontSize: '0.7rem',
+                    fontWeight: 700,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: 3,
+                    boxShadow: isSelected ? '0 4px 14px rgba(0,0,0,0.4)' : 'none',
+                  }}
+                  whileHover={{ scale: 1.04 }}
+                  whileTap={{ scale: 0.96 }}
+                  animate={isSelected ? { scale: [1, 1.05, 1] } : {}}
+                  transition={{ duration: 0.3 }}
+                >
+                  <span style={{ fontSize: '1.3rem', lineHeight: 1 }}>{cfg.emoji}</span>
+                  <span>{cfg.label}</span>
+                  <span style={{ fontSize: '0.6rem', opacity: 0.7, fontWeight: 500 }}>{cfg.desc}</span>
+                </motion.button>
+              );
+            })}
+          </div>
+        </div>
+
         <div className="flex flex-col gap-2 w-full">
-          <label style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.75rem' }}>Ton prénom</label>
-          <input style={inputStyle} value={p1} onChange={e => setP1(e.target.value)} placeholder="Joueur 1" />
+          <label style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.75rem' }}>Ton surnom gourmand</label>
+          <input style={inputStyle} value={p1} onChange={e => setP1(e.target.value)} placeholder="Gourmand" />
         </div>
         <div className="flex flex-col gap-2 w-full">
-          <label style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.75rem' }}>Nom de l'IA</label>
+          <label style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.75rem' }}>Nom de l&apos;IA</label>
           <input style={inputStyle} value={p2} onChange={e => setP2(e.target.value)} placeholder="IA Sucrée" />
         </div>
         <button
           className="btn-candy w-full mt-1"
           style={{ background: 'linear-gradient(135deg,#E91E63,#FF9800)', fontSize: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
-          onClick={() => { playButtonClick(); onStart([p1 || 'Joueur 1', p2 || 'IA Sucrée']); }}
+          onClick={() => { playButtonClick(); onStart([p1 || 'Gourmand', p2 || 'IA Sucrée'], difficulty); }}
         >
           <GameIcon name="play" size={24} />
           Jouer !
         </button>
+        <motion.button
+          onClick={() => { playButtonClick(); onBack(); }}
+          style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.4)', fontSize: '0.78rem', fontFamily: 'var(--font-game)', display: 'flex', alignItems: 'center', gap: 5 }}
+          whileHover={{ color: 'rgba(255,255,255,0.75)' }}
+        >
+          ← Retour
+        </motion.button>
       </div>
     </motion.div>
   );
@@ -317,6 +399,7 @@ interface GameViewProps {
   onNewRound?: () => void;
   onNewGame: () => void;
   onBack: () => void;
+  showScoreModal?: boolean;
 }
 
 function GameView({
@@ -329,6 +412,7 @@ function GameView({
   onNewRound,
   onNewGame,
   onBack,
+  showScoreModal = true,
 }: GameViewProps) {
   const sizes       = useCardSizes();
   const topDiscard  = gs.discardPile[gs.discardPile.length - 1] ?? null;
@@ -369,8 +453,37 @@ function GameView({
     >
       <GameTopBar gs={gs} />
 
+      {/* Settings button — mobile only (hidden sm+) */}
+      {!isModalOpen && (
+        <motion.button
+          className="sm:hidden"
+          onClick={() => setShowMenu(true)}
+          style={{
+            position: 'fixed',
+            top: 12,
+            right: 12,
+            zIndex: 60,
+            width: 40,
+            height: 40,
+            borderRadius: '50%',
+            background: 'rgba(10,4,30,0.75)',
+            border: '1.5px solid rgba(255,215,0,0.35)',
+            backdropFilter: 'blur(10px)',
+            boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+          }}
+          whileHover={{ scale: 1.1, borderColor: 'rgba(255,215,0,0.8)' }}
+          whileTap={{ scale: 0.92 }}
+        >
+          <GameIcon name="settings" size={22} />
+        </motion.button>
+      )}
+
       <ScoreModal
-        isOpen={gs.phase === 'round_end' || gs.phase === 'game_over'}
+        isOpen={showScoreModal && (gs.phase === 'round_end' || gs.phase === 'game_over')}
         players={gs.players}
         roundNumber={gs.roundNumber}
         isGameOver={gs.phase === 'game_over'}
@@ -380,16 +493,16 @@ function GameView({
       />
 
       {/*
-        ── Responsive 3-column layout ───────────────────────────────────────
-        Desktop (flex-row): Human LEFT | Deck CENTER | AI RIGHT
-        Mobile  (flex-col): AI TOP | Deck MIDDLE | Human BOTTOM
+        ── Responsive layout ─────────────────────────────────────────────────
+        Mobile  (flex-col justify-between): Human TOP | Deck CENTER | AI BOTTOM
+        Desktop (flex-row justify-center):  Human LEFT | Deck CENTER | AI RIGHT
         CSS order handles the swap without duplicating JSX.
       */}
-      <div className="flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-4 lg:gap-8 w-full max-w-6xl flex-1 min-h-0">
+      <div className="flex flex-col sm:flex-row items-center justify-between sm:justify-center gap-0 sm:gap-4 lg:gap-8 w-full max-w-6xl flex-1 min-h-0">
 
-        {/* HUMAN – left on desktop, bottom on mobile */}
+        {/* HUMAN – top on mobile (large), left on desktop */}
         {humanPlayer && (
-          <div className="order-3 sm:order-1 flex justify-center">
+          <div className="order-1 sm:order-1 flex justify-center">
             <PlayerBoard
               player={humanPlayer}
               isActive={isHumanTurn && gs.phase !== 'round_end' && gs.phase !== 'game_over'}
@@ -402,8 +515,8 @@ function GameView({
           </div>
         )}
 
-        {/* DECK / DISCARD – always center */}
-        <div className="order-1 sm:order-2 flex justify-center">
+        {/* DECK / DISCARD – center on both */}
+        <div className="order-2 sm:order-2 flex justify-center">
           <DeckDiscard
             deckCount={gs.deck.length}
             topDiscard={topDiscard}
@@ -418,16 +531,19 @@ function GameView({
           />
         </div>
 
-        {/* AI – right on desktop, visible on all screens */}
+        {/* AI – bottom on mobile (compact), right on desktop — safe-area aware */}
         {aiPlayer && (
-          <div className="flex order-2 sm:order-3 justify-center">
+          <div
+            className="order-3 sm:order-3 flex justify-center"
+            style={{ paddingBottom: 'max(4px, env(safe-area-inset-bottom))' }}
+          >
             <PlayerBoard
               player={aiPlayer}
               isActive={!isHumanTurn && gs.phase !== 'round_end' && gs.phase !== 'game_over'}
               isHuman={false}
               turnPhase={gs.turnPhase}
               gamePhase={gs.phase}
-              cardSize={sizes.human}
+              cardSize={sizes.ai}
               showLabel={true}
             />
           </div>
@@ -452,7 +568,7 @@ function GameView({
 }
 
 // ─── VS AI game controller ────────────────────────────────────────────────────
-function VsAiGame({ names, onBackToMenu }: { names: string[]; onBackToMenu: () => void }) {
+function VsAiGame({ names, difficulty, onBackToMenu }: { names: string[]; difficulty: AiDifficulty; onBackToMenu: () => void }) {
   const {
     gameState, startGame, initialReveal,
     drawDiscard, drawDeck, discardCard,
@@ -461,12 +577,25 @@ function VsAiGame({ names, onBackToMenu }: { names: string[]; onBackToMenu: () =
 
   useSoundEffects(gameState);
   const aiTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [showEndAnim, setShowEndAnim] = useState(false);
+  const prevPhaseRef = useRef<string | null>(null);
 
   // Start game on mount
   useEffect(() => {
     playGameStart();
     startGame(names);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Trigger end-game animation on phase transition to game_over
+  useEffect(() => {
+    if (!gameState) return;
+    const prev = prevPhaseRef.current;
+    prevPhaseRef.current = gameState.phase;
+    if (gameState.phase === 'game_over' && prev !== 'game_over') {
+      const t = setTimeout(() => setShowEndAnim(true), 0);
+      return () => clearTimeout(t);
+    }
+  }, [gameState?.phase]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // AI auto-play
   useEffect(() => {
@@ -490,15 +619,16 @@ function VsAiGame({ names, onBackToMenu }: { names: string[]; onBackToMenu: () =
           initialReveal(currentPlayerIndex, row, col);
         }
       } else {
-        aiTurn();
+        aiTurn(difficulty);
       }
     }, 850);
     return () => { if (aiTimerRef.current) clearTimeout(aiTimerRef.current); };
-  }, [gameState, aiTurn, initialReveal]);
+  }, [gameState, aiTurn, initialReveal, difficulty]);
 
   if (!gameState) return null;
   const gs = gameState;
   const isHumanTurn = gs.players[gs.currentPlayerIndex].isHuman;
+  const winner = [...gs.players].sort((a, b) => a.totalScore - b.totalScore)[0];
 
   function handleCardClick(row: number, col: number) {
     const { phase, turnPhase, currentPlayerIndex } = gs;
@@ -508,17 +638,26 @@ function VsAiGame({ names, onBackToMenu }: { names: string[]; onBackToMenu: () =
   }
 
   return (
-    <GameView
-      gameState={gs}
-      isHumanTurn={isHumanTurn}
-      onCardClick={handleCardClick}
-      onDrawDeck={() => { playDrawDeck(); drawDeck(); }}
-      onDrawDiscard={() => { playDrawDiscard(); drawDiscard(); }}
-      onDiscardCard={() => { playDiscard(); discardCard(); }}
-      onNewRound={() => { playButtonClick(); newRound(); }}
-      onNewGame={() => { playButtonClick(); onBackToMenu(); }}
-      onBack={() => { playButtonClick(); onBackToMenu(); }}
-    />
+    <>
+      <EndGameAnimation
+        isVisible={showEndAnim}
+        isVictory={winner?.isHuman ?? false}
+        winnerName={winner?.name ?? ''}
+        onComplete={() => setShowEndAnim(false)}
+      />
+      <GameView
+        gameState={gs}
+        isHumanTurn={isHumanTurn}
+        onCardClick={handleCardClick}
+        onDrawDeck={() => { playDrawDeck(); drawDeck(); }}
+        onDrawDiscard={() => { playDrawDiscard(); drawDiscard(); }}
+        onDiscardCard={() => { playDiscard(); discardCard(); }}
+        onNewRound={() => { playButtonClick(); newRound(); }}
+        onNewGame={() => { playButtonClick(); onBackToMenu(); }}
+        onBack={() => { playButtonClick(); onBackToMenu(); }}
+        showScoreModal={!showEndAnim}
+      />
+    </>
   );
 }
 
@@ -733,13 +872,15 @@ function VsHumanGame({ onBackToMenu, token, authUser, authLoading, onLoginGoogle
 
 // ─── Root App ─────────────────────────────────────────────────────────────────
 export default function App() {
-  const [mode, setMode]         = useState<AppMode>('menu');
-  const [names, setNames]       = useState<string[]>([]);
-  const [showRules, setShowRules] = useState(false);
+  const [mode, setMode]             = useState<AppMode>('menu');
+  const [names, setNames]           = useState<string[]>([]);
+  const [difficulty, setDifficulty] = useState<AiDifficulty>('medium');
+  const [showRules, setShowRules]   = useState(false);
   const { user: authUser, token, loading: authLoading, loginWithGoogle, loginWithFacebook, logout } = useAuth();
 
-  function handleVsAiStart(n: string[]) {
+  function handleVsAiStart(n: string[], d: AiDifficulty) {
     setNames(n);
+    setDifficulty(d);
     setMode('vs_ai');
   }
 
@@ -766,13 +907,14 @@ export default function App() {
           <motion.div key="setup" className="flex-1 flex items-center justify-center" exit={{ opacity: 0, scale: 0.9 }}>
             <VsAiSetup
               onStart={handleVsAiStart}
+              onBack={() => setMode('menu')}
             />
           </motion.div>
         )}
 
         {mode === 'vs_ai' && names.length > 0 && (
           <motion.div key="vsai" className="flex-1 flex min-h-0 w-full" exit={{ opacity: 0 }}>
-            <VsAiGame names={names} onBackToMenu={() => setMode('menu')} />
+            <VsAiGame names={names} difficulty={difficulty} onBackToMenu={() => setMode('menu')} />
           </motion.div>
         )}
 

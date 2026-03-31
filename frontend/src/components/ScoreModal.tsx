@@ -86,11 +86,11 @@ export default function ScoreModal({
                       <GameIcon name="hammer" size={48} />
                     </motion.div>
                     <div style={{ fontSize: '1.4rem', fontWeight: 900, color: '#FFD700', textShadow: '0 2px 12px rgba(255,215,0,0.6)' }}>
-                      Partie terminée !
+                      La fête est finie ! 🍭
                     </div>
                     <div style={{ fontSize: '1rem', color: 'rgba(255,255,255,0.75)', marginTop: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, flexWrap: 'wrap' }}>
                       <GameIcon name="fruit" size={22} />
-                      <span>{winner.name} remporte la partie !</span>
+                      <span>Délicieux ! {winner.name} a la meilleure recette ! ✨</span>
                     </div>
                   </>
                 ) : (
@@ -99,10 +99,10 @@ export default function ScoreModal({
                       <GameIcon name="fruit" size={40} />
                     </div>
                     <div style={{ fontSize: '1.3rem', fontWeight: 900, color: '#03A9F4', textShadow: '0 2px 8px rgba(3,169,244,0.5)' }}>
-                      Fin de manche {roundNumber}
+                      Manche {roundNumber} — c&apos;était pétillant ! ✨
                     </div>
                     <div style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.55)', marginTop: 2 }}>
-                      Scores cumulés
+                      Pépites cumulées
                     </div>
                   </>
                 )}
@@ -156,7 +156,7 @@ export default function ScoreModal({
                         </div>
                         {lastRoundScore !== undefined && (
                           <div style={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.4)' }}>
-                            +{lastRoundScore} cette manche
+                            +{lastRoundScore} pépites cette manche
                           </div>
                         )}
                       </div>
@@ -178,7 +178,7 @@ export default function ScoreModal({
                     whileTap={{ scale: 0.97 }}
                   >
                     <GameIcon name="play" size={22} />
-                    Nouvelle partie
+                    Nouvelle gourmandise !
                   </motion.button>
                 ) : (
                   <motion.button
@@ -191,7 +191,7 @@ export default function ScoreModal({
                     whileHover={{ scale: 1.03 }}
                     whileTap={{ scale: 0.97 }}
                   >
-                    Manche suivante →
+                    Manche suivante → 🏝️
                   </motion.button>
                 )}
 
@@ -220,7 +220,7 @@ export default function ScoreModal({
                   whileTap={{ scale: 0.97 }}
                 >
                   <GameIcon name="close" size={18} />
-                  Quitter la partie
+                  Quitter l&apos;île
                 </motion.button>
               </div>
 

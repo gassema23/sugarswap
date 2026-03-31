@@ -4,7 +4,7 @@
  * The engine validates every move; the AI can never cheat.
  */
 
-import type { Card, GameState, Grid, Player } from './types';
+import type { AiDifficulty, Card, GameState, Grid, Player } from './types';
 import { buildDeck, shuffleDeck } from './deck';
 
 const ROWS = 3;
@@ -131,7 +131,7 @@ export function initGame(playerNames: string[]): GameState {
     drawnCard: null,
     lastRoundPlayerIndex: null,
     roundNumber: 1,
-    message: `${players[0].name}, révèle 2 cartes pour commencer.`,
+    message: `${players[0].name}, déballe 2 cartes pour lancer la fête ! 🏝️`,
     initialRevealLeft: players.map(() => INITIAL_REVEAL_COUNT),
   };
 }
@@ -156,7 +156,7 @@ export function initialRevealCard(
   s.initialRevealLeft[playerIndex]--;
 
   if (s.initialRevealLeft[playerIndex] > 0) {
-    s.message = `${s.players[playerIndex].name}, révèle encore 1 carte.`;
+    s.message = `Encore une carte à déballer, ${s.players[playerIndex].name} ! ✨`;
     return s;
   }
 
@@ -176,9 +176,9 @@ export function initialRevealCard(
     s.currentPlayerIndex = startIndex;
     s.phase = 'playing';
     s.turnPhase = 'draw';
-    s.message = `${s.players[startIndex].name} commence ! Pioche ou prends la défausse.`;
+    s.message = `C'est à ${s.players[startIndex].name} de briller ! Récolte au Paquet ou pique sur le Plateau ! 🍭`;
   } else {
-    s.message = `${s.players[nextPlayer].name}, révèle 2 cartes pour commencer.`;
+    s.message = `${s.players[nextPlayer].name}, déballe 2 cartes pour lancer la fête ! 🏝️`;
   }
 
   return s;
@@ -195,7 +195,7 @@ export function drawFromDiscard(state: GameState): GameState {
   const card = s.discardPile.pop()!;
   s.drawnCard = { ...card, isRevealed: true };
   s.turnPhase = 'discard_or_swap';
-  s.message = `Tu as pris "${card.value}" depuis la défausse. Échange-la avec une carte de ta grille (obligatoire).`;
+  s.message = `Tu pinces un « ${card.value} » sur le Plateau ! Swappe avec une case de ta grille (obligatoire).`;
   // Note: drawing from discard forces a swap — no option to discard it back.
   return s;
 }
@@ -212,7 +212,7 @@ export function drawFromDeck(state: GameState): GameState {
   const card = s.deck.shift()!;
   s.drawnCard = { ...card, isRevealed: true };
   s.turnPhase = 'discard_or_swap';
-  s.message = `Tu as pioché "${card.value}". Échange-la ou défausse-la (puis révèle une carte cachée).`;
+  s.message = `Tu récoltes un « ${card.value} » du Paquet ! Swap ou pose sur le Plateau, puis déballe une carte cachée.`;
   return s;
 }
 
@@ -229,7 +229,7 @@ export function discardDrawnCard(state: GameState): GameState {
   s.discardPile.push({ ...s.drawnCard!, isRevealed: true });
   s.drawnCard = null;
   s.turnPhase = 'reveal_hidden';
-  s.message = `Carte défaussée. Maintenant révèle une carte cachée de ta grille.`;
+  s.message = `Sur le Plateau ! Maintenant déballe une carte encore cachée sur ton îlot.`;
   return s;
 }
 
@@ -314,7 +314,7 @@ function endTurn(state: GameState): GameState {
     );
     s.lastRoundPlayerIndex = s.currentPlayerIndex;
     s.phase = 'last_round';
-    s.message = `${player.name} a retourné sa dernière carte ! Les autres joueurs ont encore un tour.`;
+    s.message = `${player.name} a tout déballé ! Dernier tour pour les autres… puis on compte les pépites ! ✨`;
   }
 
   // Advance to next player
@@ -329,7 +329,7 @@ function endTurn(state: GameState): GameState {
 
   s.currentPlayerIndex = nextPlayer;
   s.turnPhase = 'draw';
-  s.message = `${s.players[nextPlayer].name}, pioche ou prends la défausse.`;
+  s.message = `${s.players[nextPlayer].name}, récolte au Paquet ou pique sur le Plateau ! 🍬`;
   return s;
 }
 
@@ -369,8 +369,8 @@ function endRound(state: GameState): GameState {
 
   const doubled = finalFinisherScore !== finisherScore;
   s.message = doubled
-    ? `Score DOUBLÉ pour ${s.players[finisherIdx].name} (${finisherScore}→${finalFinisherScore}) !`
-    : `Fin de manche ! Scores calculés.`;
+    ? `Aïe ! Le sucre est monté à la tête… pépites doublées pour ${s.players[finisherIdx].name} (${finisherScore}→${finalFinisherScore}) ! 🍬x2`
+    : `Fin de manche ! On additionne les pépites ✨`;
 
   return s;
 }
@@ -418,24 +418,61 @@ export function startNewRound(state: GameState): GameState {
     drawnCard: null,
     lastRoundPlayerIndex: null,
     roundNumber: state.roundNumber + 1,
-    message: `Manche ${state.roundNumber + 1} ! ${players[startIndex].name}, révèle 2 cartes.`,
+    message: `Manche ${state.roundNumber + 1} ! ${players[startIndex].name}, déballe 2 cartes pour lancer la fête ! 🏝️`,
     initialRevealLeft: players.map(() => INITIAL_REVEAL_COUNT),
   };
 }
 
-// ─── AI TURN (simple heuristic — placeholder for future RL model) ─────────────
+// ─── AI TURN ─────────────────────────────────────────────────────────────────
 // The AI only uses information a human player would have:
 //   • Its own revealed cards
 //   • The top card of the discard pile
 //   • The drawn card (when it holds one)
 // It never reads hidden card values.
+//
+// Difficulty profiles:
+//   easy   — hesitant, high mistake rate, no column strategy
+//   medium — balanced heuristic with small imperfection rate
+//   expert — sharp: prefers combo setups, low mistake rate, strategic swaps
 
-export function aiTakeTurn(state: GameState): GameState {
+interface AiProfile {
+  discardThreshold: number;  // take discard if value ≤ this AND it improves worst
+  missDiscardRate:  number;  // probability of ignoring a good discard
+  noSwapRate:       number;  // probability of not swapping even when beneficial
+  comboAware:       boolean; // look for column-combo opportunities
+}
+
+const AI_PROFILES: Record<AiDifficulty, AiProfile> = {
+  easy:   { discardThreshold: 1,  missDiscardRate: 0.50, noSwapRate: 0.40, comboAware: false },
+  medium: { discardThreshold: 3,  missDiscardRate: 0.10, noSwapRate: 0.05, comboAware: false },
+  expert: { discardThreshold: 2,  missDiscardRate: 0.02, noSwapRate: 0.02, comboAware: true  },
+};
+
+/** For expert mode: find a column where 2 of 3 visible cards match drawnValue. */
+function findComboTarget(grid: Grid, drawnValue: number): [number, number] | null {
+  for (let col = 0; col < COLS; col++) {
+    const cells = grid.map(row => row[col]);
+    const revealed = cells.filter(c => c !== null && c.isRevealed);
+    const matchCount = revealed.filter(c => c!.value === drawnValue).length;
+    if (matchCount >= 2) {
+      // Find the non-revealed or non-matching slot to place the card
+      for (let row = 0; row < ROWS; row++) {
+        const c = cells[row];
+        if (c !== null && (!c.isRevealed || c.value !== drawnValue)) {
+          return [row, col];
+        }
+      }
+    }
+  }
+  return null;
+}
+
+export function aiTakeTurn(state: GameState, difficulty: AiDifficulty = 'medium'): GameState {
   let s = cloneState(state);
+  const prof = AI_PROFILES[difficulty];
 
   // ── Phase: draw ───────────────────────────────────────────────────────────
   if (s.turnPhase === 'draw') {
-    // Always re-read from current state (never stale reference)
     const currentPlayer = s.players[s.currentPlayerIndex];
     const topDiscard = s.discardPile[s.discardPile.length - 1];
 
@@ -446,22 +483,28 @@ export function aiTakeTurn(state: GameState): GameState {
 
     const maxVisible = visibleValues.length > 0 ? Math.max(...visibleValues) : -Infinity;
 
-    // Take discard only if it clearly improves the worst visible card
-    const shouldTakeDiscard =
+    const isGoodDiscard =
       topDiscard !== undefined &&
-      topDiscard.value <= 3 &&
-      maxVisible > topDiscard.value &&
-      // ~20% chance of "missing" a good discard — simulates human imperfection
-      Math.random() > 0.10;
+      topDiscard.value <= prof.discardThreshold &&
+      maxVisible > topDiscard.value;
 
+    const shouldTakeDiscard = isGoodDiscard && Math.random() > prof.missDiscardRate;
     s = shouldTakeDiscard ? drawFromDiscard(s) : drawFromDeck(s);
   }
 
   // ── Phase: discard_or_swap ────────────────────────────────────────────────
   if (s.turnPhase === 'discard_or_swap' && s.drawnCard) {
-    // Re-read from current state (fixes stale-reference bug)
     const currentPlayer = s.players[s.currentPlayerIndex];
     const drawnValue = s.drawnCard.value;
+
+    // Expert: check for 2-of-3 combo opportunity first
+    if (prof.comboAware) {
+      const comboTarget = findComboTarget(currentPlayer.grid, drawnValue);
+      if (comboTarget && Math.random() > prof.noSwapRate) {
+        s = swapWithGrid(s, comboTarget[0], comboTarget[1]);
+        return s;
+      }
+    }
 
     // Find the worst VISIBLE card to potentially replace
     let worstRow = -1, worstCol = -1, worstValue = -Infinity;
@@ -478,13 +521,8 @@ export function aiTakeTurn(state: GameState): GameState {
 
     const canImprove = worstRow !== -1 && drawnValue < worstValue;
 
-    if (canImprove) {
-      // ~15% chance of not swapping even when it would be beneficial
-      if (Math.random() > 0.05) {
-        s = swapWithGrid(s, worstRow, worstCol);
-      } else {
-        s = discardDrawnCard(s);
-      }
+    if (canImprove && Math.random() > prof.noSwapRate) {
+      s = swapWithGrid(s, worstRow, worstCol);
     } else {
       s = discardDrawnCard(s);
     }
@@ -494,7 +532,6 @@ export function aiTakeTurn(state: GameState): GameState {
   if (s.turnPhase === 'reveal_hidden') {
     const currentPlayer = s.players[s.currentPlayerIndex];
 
-    // Collect ALL hidden card positions — pick one at random (not always top-left)
     const hidden: [number, number][] = [];
     for (let r = 0; r < ROWS; r++) {
       for (let c = 0; c < COLS; c++) {
@@ -504,7 +541,22 @@ export function aiTakeTurn(state: GameState): GameState {
     }
 
     if (hidden.length > 0) {
-      const [r, c] = hidden[Math.floor(Math.random() * hidden.length)];
+      // Expert: prefer revealing in columns that already have 2 matching visible cards
+      let target: [number, number] | null = null;
+      if (prof.comboAware) {
+        for (const [r, c] of hidden) {
+          const colCells = currentPlayer.grid.map(row => row[c]);
+          const revealed = colCells.filter(card => card !== null && card.isRevealed);
+          if (revealed.length >= 2) {
+            const val = revealed[0]!.value;
+            if (revealed.every(card => card!.value === val)) {
+              target = [r, c];
+              break;
+            }
+          }
+        }
+      }
+      const [r, c] = target ?? hidden[Math.floor(Math.random() * hidden.length)];
       s = revealHiddenCard(s, r, c);
     }
   }

@@ -60,7 +60,17 @@ export default function DeckDiscard({
   const labelSize = cardSize < 50 ? '0.7rem' : '0.875rem';
 
   return (
-    <div className="flex flex-row items-end gap-y-4 gap-x-6 sm:gap-x-10">
+    <div
+      className="flex flex-row items-end gap-y-4 gap-x-6 sm:gap-x-10"
+      style={{
+        padding: '10px 16px 12px',
+        borderRadius: 20,
+        background: 'rgba(255,255,255,0.04)',
+        border: '1px solid rgba(255,255,255,0.08)',
+        backdropFilter: 'blur(10px)',
+        boxShadow: '0 0 24px rgba(255,255,255,0.12), 0 0 48px rgba(200,120,255,0.07)',
+      }}
+    >
 
       {/* Draw pile */}
       <div className="flex flex-col items-center gap-2">
@@ -73,7 +83,7 @@ export default function DeckDiscard({
             textShadow: '0 1px 6px rgba(0,0,0,0.7), 0 0 12px rgba(0,0,0,0.5)',
           }}
         >
-          Pioche ({deckCount})
+          Paquet ({deckCount})
         </span>
         <motion.div
           className={`relative ${canDrawDeck ? 'cursor-pointer' : 'opacity-70'}`}
@@ -99,7 +109,7 @@ export default function DeckDiscard({
             className="font-bold"
             style={{ fontFamily: 'var(--font-game)', fontSize: labelSize, color: '#FFD700', textShadow: '0 1px 6px rgba(0,0,0,0.7)' }}
           >
-            En main
+            En main 🍬
           </span>
           <motion.div
             style={{ width: cardSize, height: h }}
@@ -129,7 +139,7 @@ export default function DeckDiscard({
               style={{ background: 'linear-gradient(135deg, #FF5722, #E91E63)', fontSize: cardSize < 50 ? '0.7rem' : '0.875rem', padding: cardSize < 50 ? '0.25rem 0.7rem' : '0.4rem 1rem' }}
               onClick={onDiscardDrawn}
             >
-              Défausser
+              Sur le Plateau !
             </button>
           )}
         </div>
@@ -146,7 +156,7 @@ export default function DeckDiscard({
             textShadow: '0 1px 6px rgba(0,0,0,0.7), 0 0 12px rgba(0,0,0,0.5)',
           }}
         >
-          Défausse
+          Plateau
         </span>
         <motion.div
           className={`relative ${canDrawDiscard ? 'cursor-pointer' : 'opacity-70'}`}
@@ -180,7 +190,7 @@ export default function DeckDiscard({
             </>
           ) : (
             <div className="w-full h-full rounded-xl border-2 border-dashed border-white/30 flex items-center justify-center text-white/40" style={{ fontSize: labelSize }}>
-              vide
+              vide ✨
             </div>
           )}
         </motion.div>

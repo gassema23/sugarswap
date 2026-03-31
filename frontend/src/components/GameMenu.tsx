@@ -71,7 +71,7 @@ export default function GameMenu({ isOpen, onResume, onQuit }: GameMenuProps) {
             >
               <h2 style={{ margin: 0, textAlign: 'center', color: '#FFD700', fontSize: '1.3rem', textShadow: '0 0 12px rgba(255,215,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
                 <GameIcon name="settings" size={26} />
-                Menu
+                Pause sucrée
               </h2>
 
               <button
@@ -177,10 +177,10 @@ export default function GameMenu({ isOpen, onResume, onQuit }: GameMenuProps) {
                 onClick={onQuit}
               >
                 <GameIcon name="close" size={20} />
-                Quitter la partie
+                Quitter l&apos;île
               </button>
 
-              <p style={{ margin: 0, textAlign: 'center', color: 'rgba(255,255,255,0.28)', fontSize: '0.7rem' }}>
+              <p className="hidden sm:block" style={{ margin: 0, textAlign: 'center', color: 'rgba(255,255,255,0.28)', fontSize: '0.7rem' }}>
                 Appuie sur Échap pour reprendre
               </p>
             </motion.div>

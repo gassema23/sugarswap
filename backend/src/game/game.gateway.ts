@@ -101,11 +101,11 @@ export class GameGateway implements OnGatewayDisconnect {
   ) {
     const room = this.rooms.get(data.roomCode?.toUpperCase?.());
     if (!room) {
-      this.send(client, { type: 'error', message: 'Salon introuvable. Vérifie le code.' });
+      this.send(client, { type: 'error', message: 'Ce code ne mène nulle part… vérifie et réessaie ! 🍭' });
       return;
     }
     if (room.sockets.length >= room.maxPlayers) {
-      this.send(client, { type: 'error', message: 'Ce salon est déjà plein.' });
+      this.send(client, { type: 'error', message: 'Cette île est complète ! Rejoins une autre partie. 🏝️' });
       return;
     }
 

@@ -1,7 +1,5 @@
 import { useCallback, useReducer } from 'react';
-import type {
-  GameState,
-} from '../engine/types';
+import type { AiDifficulty, GameState } from '../engine/types';
 import {
   initGame,
   initialRevealCard,
@@ -24,7 +22,7 @@ type Action =
   | { type: 'SWAP_GRID'; row: number; col: number }
   | { type: 'REVEAL_HIDDEN'; row: number; col: number }
   | { type: 'NEW_ROUND' }
-  | { type: 'AI_TURN' }
+  | { type: 'AI_TURN'; difficulty: AiDifficulty }
   | { type: 'SET_STATE'; state: GameState }; // used by online mode to sync peer state
 
 // ─── Reducer ─────────────────────────────────────────────────────────────────
@@ -49,7 +47,7 @@ function gameReducer(state: GameState | null, action: Action): GameState | null 
     case 'NEW_ROUND':
       return startNewRound(state);
     case 'AI_TURN':
-      return aiTakeTurn(state);
+      return aiTakeTurn(state, action.difficulty);
     default:
       return state;
   }
@@ -81,7 +79,9 @@ export function useGame() {
 
   const newRound = useCallback(() => dispatch({ type: 'NEW_ROUND' }), []);
 
-  const aiTurn = useCallback(() => dispatch({ type: 'AI_TURN' }), []);
+  const aiTurn = useCallback((difficulty: AiDifficulty = 'medium') => {
+    dispatch({ type: 'AI_TURN', difficulty });
+  }, []);
 
   const setState = useCallback((state: GameState) => {
     dispatch({ type: 'SET_STATE', state });

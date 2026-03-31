@@ -94,7 +94,7 @@ export default function Card({
       initial={{ scale: 0, opacity: 0, y: -80 }}
       animate={{ scale: 1, opacity: 1, y: 0 }}
       transition={{ type: 'spring', stiffness: 260, damping: 22, delay: dealDelay }}
-      whileHover={interactive ? { scale: 1.08, y: -4, zIndex: 10 } : {}}
+      whileHover={interactive ? { scale: 1.2, y: -8, zIndex: 50, boxShadow: '0 20px 48px rgba(0,0,0,0.7), 0 0 24px rgba(255,215,0,0.35)' } : {}}
       whileTap={interactive ? { scale: 0.95 } : {}}
       onClick={interactive ? onClick : undefined}
       className={`relative flip-container ${interactive ? 'cursor-pointer' : ''} ${interactive && !highlight ? 'card-reveal-pulse' : ''}`}
