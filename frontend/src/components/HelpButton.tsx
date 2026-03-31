@@ -104,7 +104,7 @@ export default function HelpButton({ gamePhase, turnPhase, isHumanTurn, hasDrawn
       <motion.button
         style={{
           position: 'fixed',
-          bottom: 'calc(env(safe-area-inset-bottom, 0px) + 16px)',
+          bottom: 'calc(env(safe-area-inset-bottom, 0px) + 82px)',
           right: 16,
           zIndex: 50,
           width: 52,
@@ -132,7 +132,7 @@ export default function HelpButton({ gamePhase, turnPhase, isHumanTurn, hasDrawn
         onClick={() => setOpen(v => !v)}
         aria-label="Aide"
       >
-        <GameIcon name="bookPink" size={28} />
+        <span style={{ fontSize: '1.5rem', fontWeight: 900, color: 'white', textShadow: '0 2px 6px rgba(0,0,0,0.45)' }}>?</span>
       </motion.button>
 
       <AnimatePresence>
