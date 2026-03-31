@@ -4,7 +4,6 @@ import type { OnlineStatus } from '../hooks/useOnlineGame';
 import type { AuthUser } from '../hooks/useAuth';
 import { playButtonClick } from '../utils/sounds';
 import GameIcon from './GameIcon';
-import AuthPanel from './AuthPanel';
 import Logo from './Logo';
 
 interface Props {
@@ -46,10 +45,6 @@ export default function OnlineLobby({
   playerIndex,
   errorMsg,
   authUser,
-  authLoading,
-  onLoginGoogle,
-  onLoginFacebook,
-  onLogout,
   onCreateRoom,
   onJoinRoom,
   onStartGame,
