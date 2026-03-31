@@ -96,10 +96,28 @@ jobs:
           KEY="$GITHUB_WORKSPACE/.deploy_ssh_key"
           ssh -i "$KEY" -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=accept-new \
             "$VPS_USER@$VPS_HOST" "mkdir -p -- \"$DEPLOY_DIR\""
-          # docker-compose.yml and Caddyfile are now at the repo root
           scp -i "$KEY" -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=accept-new \
             docker-compose.yml Caddyfile \
             "$VPS_USER@$VPS_HOST:$DEPLOY_DIR/"
+
+      - name: Write .env on VPS
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+        run: |
+          set -euo pipefail
+          KEY="$GITHUB_WORKSPACE/.deploy_ssh_key"
+          # Write the .env file directly on the VPS via SSH — secrets never touch the repo
+          ssh -i "$KEY" -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=accept-new \
+            "$VPS_USER@$VPS_HOST" "cat > \"$DEPLOY_DIR/.env\"" <<EOF
+          DATABASE_URL=${{ secrets.DATABASE_URL }}
+          JWT_SECRET=${{ secrets.JWT_SECRET }}
+          JWT_EXPIRES_IN=${{ secrets.JWT_EXPIRES_IN }}
+          GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}
+          FACEBOOK_APP_ID=${{ secrets.FACEBOOK_APP_ID }}
+          FACEBOOK_APP_SECRET=${{ secrets.FACEBOOK_APP_SECRET }}
+          EOF
 
       - name: Pull images & restart
         env:
