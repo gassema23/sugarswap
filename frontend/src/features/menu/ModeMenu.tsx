@@ -3,6 +3,7 @@ import Logo from '@/components/Logo';
 import AuthPanel from '@/components/AuthPanel';
 import { playButtonClick } from '@/utils/sounds';
 import type { AuthUser } from '@/hooks/useAuth';
+import { AI_NAME } from '@/constants';
 
 type MenuMode = 'vs_ai' | 'vs_human';
 
@@ -83,7 +84,7 @@ export default function ModeMenu({
             <line x1="4" y1="13" x2="2" y2="13" stroke="white" strokeWidth="1.8" strokeLinecap="round"/>
             <line x1="20" y1="13" x2="22" y2="13" stroke="white" strokeWidth="1.8" strokeLinecap="round"/>
           </svg>
-          Solo vs 
+          Solo vs {AI_NAME} 🍭
         </button>
 
         <button
