@@ -231,6 +231,28 @@ export class GameGateway implements OnGatewayDisconnect {
     this.relay(room, client, { type: 'game_over', scores: data.scores });
 
     const isOnline = room.sockets.length > 1;
+    const endedAt  = new Date();
+    const winnerIdx = data.scores.reduce((min, s) => s.points < min.points ? s : min, data.scores[0]).playerIndex;
+
+    // Create ONE match record for the entire game
+    try {
+      await this.progression.createMatch({
+        mode:      isOnline ? 'ONLINE' : 'VS_AI',
+        startedAt: room.startedAt ?? endedAt,
+        endedAt,
+        players:   room.sockets.map((_, i) => ({
+          userId:   room.userIds[i] ?? null,
+          name:     room.names[i],
+          points:   data.scores.find((s) => s.playerIndex === i)?.points ?? 0,
+          isAi:     false,
+          isWinner: i === winnerIdx,
+        })),
+      });
+    } catch (err) {
+      console.error(`[game_over] createMatch error:`, err);
+    }
+
+    // Update progression for each authenticated player individually
     await Promise.all(
       room.sockets.map(async (socket, idx) => {
         const userId = room.userIds[idx];
@@ -240,20 +262,10 @@ export class GameGateway implements OnGatewayDisconnect {
         if (!playerScore) return;
 
         try {
-          const endedAt = new Date();
-          const result = await this.progression.recordGameResult({
+          const result = await this.progression.recordPlayerProgression({
             userId,
-            points:     playerScore.points,
+            points:   playerScore.points,
             isOnline,
-            startedAt:  room.startedAt ?? endedAt,
-            endedAt,
-            allPlayers: room.sockets.map((_, i) => ({
-              userId:   room.userIds[i] ?? null,
-              name:     room.names[i],
-              points:   data.scores.find((s) => s.playerIndex === i)?.points ?? 0,
-              isAi:     false,
-              isWinner: data.scores.reduce((min, s) => s.points < min.points ? s : min, data.scores[0]).playerIndex === i,
-            })),
           });
 
           if (socket) this.send(socket, {
