@@ -9,7 +9,6 @@ import PlayersBar from '@/shared/components/PlayersBar';
 import PlayerBoard from '@/components/PlayerBoard';
 import DeckDiscard from '@/components/DeckDiscard';
 import ScoreModal from '@/components/ScoreModal';
-import GameMessage from '@/components/GameMessage';
 import GameMenu from '@/components/GameMenu';
 import EndGameAnimation from '@/components/EndGameAnimation';
 import {
