@@ -18,7 +18,7 @@ import {
   playDiscard,
   playSwapCard,
   playGameStart,
-} from '@/utils/sounds';
+} from '@/shared/utils/sounds';
 
 interface VsAiGameProps {
   names: string[];

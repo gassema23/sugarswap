@@ -1,6 +1,6 @@
 import { motion, AnimatePresence } from 'framer-motion';
-import type { Player } from '../engine/types';
-import { gridScore } from '../engine/gameEngine';
+import type { Player } from '@/features/game';
+import { gridScore } from '@/features/game';
 import Card from './Card';
 import GameIcon from './GameIcon';
 

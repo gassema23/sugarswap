@@ -1,8 +1,8 @@
 import { useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import type { Card as CardType } from '../engine/types';
-import { cardColor, cardTextColor } from '../engine/deck';
-import { playFlip } from '../utils/sounds';
+import type { Card as CardType } from '@/features/game';
+import { cardColor, cardTextColor } from '@/features/game';
+import { playFlip } from '@/shared/utils/sounds';
 
 interface CardProps {
   card: CardType | null;

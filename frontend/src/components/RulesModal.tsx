@@ -1,6 +1,6 @@
 import { motion, AnimatePresence } from 'framer-motion';
-import { cardColor, cardTextColor } from '../engine/deck';
-import type { CardValue } from '../engine/types';
+import { cardColor, cardTextColor } from '@/features/game';
+import type { CardValue } from '@/features/game';
 import GameIcon, { type SpriteIconId } from './GameIcon';
 
 // ─── Mini candy card (illustrative) ──────────────────────────────────────────

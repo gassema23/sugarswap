@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useAuth } from './hooks/useAuth';
+import { useAuth } from '@/features/auth';
 import Background from './components/Background';
 import RulesModal from './components/RulesModal';
 import LeaderboardModal from './components/LeaderboardModal';

@@ -11,14 +11,14 @@ import ScoreModal from '@/components/ScoreModal';
 import GameMenu from '@/components/GameMenu';
 import OnlineLobby from '@/components/OnlineLobby';
 import ProgressionToast from '@/components/ProgressionToast';
-import type { AuthUser } from '@/hooks/useAuth';
+import type { AuthUser } from '@/features/auth';
 import {
   playButtonClick,
   playDrawDeck,
   playDrawDiscard,
   playDiscard,
   playSwapCard,
-} from '@/utils/sounds';
+} from '@/shared/utils/sounds';
 
 interface VsHumanGameProps {
   onBackToMenu: () => void;

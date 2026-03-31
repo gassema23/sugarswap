@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from 'framer-motion';
-import type { Player } from '../engine/types';
+import type { Player } from '@/features/game';
 import GameIcon, { rankSprite } from './GameIcon';
 
 interface ScoreBoardProps {

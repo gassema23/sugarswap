@@ -5,7 +5,7 @@
  */
 
 import { motion } from 'framer-motion';
-import type { AuthUser } from '../hooks/useAuth';
+import type { AuthUser } from '@/features/auth';
 
 // Shared style for social login buttons — dark glass, matches candy theme
 const socialBtnStyle: React.CSSProperties = {

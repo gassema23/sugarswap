@@ -1,8 +1,8 @@
 import { motion } from 'framer-motion';
 import Logo from '@/components/Logo';
 import AuthPanel from '@/components/AuthPanel';
-import { playButtonClick } from '@/utils/sounds';
-import type { AuthUser } from '@/hooks/useAuth';
+import { playButtonClick } from '@/shared/utils/sounds';
+import type { AuthUser } from '@/features/auth';
 import { AI_NAME } from '@/constants';
 
 type MenuMode = 'vs_ai' | 'vs_human';

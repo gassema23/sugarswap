@@ -7,7 +7,7 @@ import {
   playVictory,
   playDefeat,
   playTurnStart,
-} from '@/utils/sounds';
+} from '@/shared/utils/sounds';
 
 export function useSoundEffects(gameState: GameState | null) {
   const prevPhaseRef     = useRef<string | null>(null);

@@ -6,7 +6,7 @@
 
 import { useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import type { ProgressionUpdate } from '../hooks/useOnlineGame';
+import type { ProgressionUpdate } from '@/features/online';
 
 const BADGE_LABELS: Record<string, string> = {
   FIRST_WIN:        '🏅 1ère victoire',

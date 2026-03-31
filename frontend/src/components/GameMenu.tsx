@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { setMuted, isMuted } from '../utils/sounds';
+import { setMuted, isMuted } from '@/shared/utils/sounds';
 import GameIcon from './GameIcon';
 
 interface GameMenuProps {

@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion';
-import type { Card as CardType } from '../engine/types';
-import { cardColor, cardTextColor } from '../engine/deck';
+import type { Card as CardType } from '@/features/game';
+import { cardColor, cardTextColor } from '@/features/game';
 
 interface DeckDiscardProps {
   deckCount: number;

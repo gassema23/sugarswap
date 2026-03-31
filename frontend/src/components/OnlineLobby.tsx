@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import type { OnlineStatus } from '../hooks/useOnlineGame';
-import type { AuthUser } from '../hooks/useAuth';
-import { playButtonClick } from '../utils/sounds';
+import type { OnlineStatus } from '@/features/online';
+import type { AuthUser } from '@/features/auth';
+import { playButtonClick } from '@/shared/utils/sounds';
 import GameIcon from './GameIcon';
 import Logo from './Logo';
 
