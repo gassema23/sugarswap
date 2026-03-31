@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
+import { useAuth } from '@/hooks/useAuth';
 import type { AiDifficulty } from '../engine/types';
 import Logo from '@/components/Logo';
 import GameIcon from '@/components/GameIcon';
@@ -17,7 +18,8 @@ interface VsAiSetupProps {
 }
 
 export default function VsAiSetup({ onStart, onBack }: VsAiSetupProps) {
-  const [p1, setP1] = useState('Gourmand');
+  const { user: authUser } = useAuth();
+  const [p1, setP1] = useState(authUser?.name ?? 'Gourmand');
   const [p2, setP2] = useState('IA Sucrée');
   const [difficulty, setDifficulty] = useState<AiDifficulty>('medium');
 
