@@ -134,41 +134,46 @@ export default function VsAiGame({ names, difficulty, onBackToMenu }: VsAiGamePr
 
       <motion.div
         key="game"
-        className="w-full flex-1 flex flex-col items-center px-2 sm:px-4 py-1 sm:py-2 gap-1 sm:gap-2 relative z-10 min-h-0"
+        className="w-full flex-1 flex flex-col items-center px-2 sm:px-4 py-2 sm:py-2 relative z-10 min-h-0"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
       >
-        <GameTopBar gs={gs} />
+        {/* Modals & overlays — outside layout flow */}
+        <ScoreModal
+          isOpen={!showEndAnim && isModalOpen}
+          players={gs.players}
+          roundNumber={gs.roundNumber}
+          isGameOver={gs.phase === 'game_over'}
+          onNewRound={() => { playButtonClick(); newRound(); }}
+          onNewGame={() => { playButtonClick(); onBackToMenu(); }}
+          onQuit={() => { playButtonClick(); onBackToMenu(); }}
+        />
 
-        {/* Mobile fixed message overlay — must NOT use display in inline style */}
-        <div
-          className="visible sm:invisible flex justify-center pointer-events-none"
-          style={{ zIndex: 45, padding: '0 0 0 12px' }}
-        >
-          <GameMessage message={gs.message} compact />
-        </div>
+        <GameMenu
+          isOpen={showMenu}
+          onResume={() => setShowMenu(false)}
+          onQuit={() => { playButtonClick(); onBackToMenu(); }}
+        />
 
-        {/* Settings FAB — mobile only */}
+        {/* Settings FAB — fixed bottom-right, never overlaps in-flow content */}
         {!isModalOpen && (
           <motion.button
-            className="visible sm:invisible"
+            className="sm:hidden"
             onClick={() => setShowMenu(true)}
             style={{
               position: 'fixed',
               bottom: 'calc(env(safe-area-inset-bottom, 0px) + 16px)',
               right: 16,
               zIndex: 60,
-              width: 52,
-              height: 52,
+              width: 48,
+              height: 48,
               borderRadius: '50%',
               background: 'rgba(10, 4, 30, 0.95)',
               border: '3px solid rgba(255,255,255,0.9)',
               cursor: 'pointer',
-              fontFamily: 'var(--font-game)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              boxShadow: '0 4px 20px rgba(0,0,0,0.35)',
             }}
             whileHover={{ scale: 1.15 }}
             whileTap={{ scale: 0.92 }}
@@ -181,60 +186,52 @@ export default function VsAiGame({ names, difficulty, onBackToMenu }: VsAiGamePr
             }}
             transition={{ duration: 2.5, repeat: Infinity, repeatDelay: 1 }}
           >
-            <span style={{ fontSize: '1.5rem', fontWeight: 900, color: 'white', textShadow: '0 2px 6px rgba(0,0,0,0.45)' }}>⚙</span>
+            <span style={{ fontSize: '1.4rem', fontWeight: 900, color: 'white' }}>⚙</span>
           </motion.button>
         )}
 
-        <ScoreModal
-          isOpen={!showEndAnim && isModalOpen}
-          players={gs.players}
-          roundNumber={gs.roundNumber}
-          isGameOver={gs.phase === 'game_over'}
-          onNewRound={() => { playButtonClick(); newRound(); }}
-          onNewGame={() => { playButtonClick(); onBackToMenu(); }}
-          onQuit={() => { playButtonClick(); onBackToMenu(); }}
-        />
+        {/* ── In-flow layout — 5 sections stacked, distributed to fill height ── */}
+        <div className="flex-1 w-full flex flex-col items-center justify-between sm:justify-start sm:gap-3 min-h-0 pb-20 sm:pb-2">
 
-        {/* All players status bar (human + AI) */}
-        <PlayersBar
-          players={gs.players}
-          currentPlayerIndex={gs.currentPlayerIndex}
-          gamePhase={gs.phase}
-        />
+          {/* 1. Numéro de la manche */}
+          <GameTopBar gs={gs} />
 
-        {/* Deck / Discard */}
-        <DeckDiscard
-          deckCount={gs.deck.length}
-          topDiscard={topDiscard}
-          drawnCard={gs.drawnCard}
-          canDrawDiscard={canDrawDiscard}
-          canDrawDeck={canDrawDeck}
-          canDiscardDrawn={canDiscardDrawn}
-          onDrawDiscard={() => { playDrawDiscard(); drawDiscard(); }}
-          onDrawDeck={() => { playDrawDeck(); drawDeck(); }}
-          onDiscardDrawn={() => { playDiscard(); discardCard(); }}
-          cardSize={sizes.deck}
-        />
-
-        {/* Human board only — label suppressed, shown in PlayersBar */}
-        {humanPlayer && (
-          <PlayerBoard
-            player={humanPlayer}
-            isActive={isHumanTurn && !isModalOpen}
-            isHuman={true}
-            turnPhase={gs.turnPhase}
+          {/* 3. Noms des participants (joueur + IA) */}
+          <PlayersBar
+            players={gs.players}
+            currentPlayerIndex={gs.currentPlayerIndex}
             gamePhase={gs.phase}
-            onCardClick={handleCardClick}
-            cardSize={sizes.me}
-            showLabel={false}
           />
-        )}
 
-        <GameMenu
-          isOpen={showMenu}
-          onResume={() => setShowMenu(false)}
-          onQuit={() => { playButtonClick(); onBackToMenu(); }}
-        />
+          {/* 4. Cartes (paquet + défausse + carte en main) */}
+          <DeckDiscard
+            deckCount={gs.deck.length}
+            topDiscard={topDiscard}
+            drawnCard={gs.drawnCard}
+            canDrawDiscard={canDrawDiscard}
+            canDrawDeck={canDrawDeck}
+            canDiscardDrawn={canDiscardDrawn}
+            onDrawDiscard={() => { playDrawDiscard(); drawDiscard(); }}
+            onDrawDeck={() => { playDrawDeck(); drawDeck(); }}
+            onDiscardDrawn={() => { playDiscard(); discardCard(); }}
+            cardSize={sizes.deck}
+          />
+
+          {/* 5. Deck du joueur */}
+          {humanPlayer && (
+            <PlayerBoard
+              player={humanPlayer}
+              isActive={isHumanTurn && !isModalOpen}
+              isHuman={true}
+              turnPhase={gs.turnPhase}
+              gamePhase={gs.phase}
+              onCardClick={handleCardClick}
+              cardSize={sizes.me}
+              showLabel={false}
+            />
+          )}
+
+        </div>
       </motion.div>
     </>
   );

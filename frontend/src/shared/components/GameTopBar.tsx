@@ -2,7 +2,6 @@ import { motion } from 'framer-motion';
 import type { GameState } from '@/features/game';
 import Logo from '@/components/Logo';
 import GameMessage from '@/components/GameMessage';
-import GameIcon from '@/components/GameIcon';
 
 export default function GameTopBar({ gs }: { gs: GameState }) {
   const roundLabel = (
@@ -23,20 +22,19 @@ export default function GameTopBar({ gs }: { gs: GameState }) {
         ].join(', '),
         letterSpacing: '0.04em',
         whiteSpace: 'nowrap',
+        textAlign: 'center',
       }}
       animate={{ scale: [1, 1.03, 1] }}
       transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
     >
       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-        <GameIcon name="fruit" size={18} />
-        Manche {gs.roundNumber} ✨
-        <GameIcon name="fruit" size={18} />
+        Manche {gs.roundNumber}
       </span>
     </motion.div>
   );
 
   return (
-    <div className="w-full max-w-6xl flex flex-col items-center gap-1 sm:gap-2">
+    <div className="w-full max-w-6xl flex flex-col items-center gap-3 sm:gap-4">
       {/* Logo: desktop only */}
       <div className="hidden sm:flex w-full justify-center">
         <Logo size="xl" />
@@ -45,7 +43,7 @@ export default function GameTopBar({ gs }: { gs: GameState }) {
         {roundLabel}
       </div>
       {/* GameMessage: desktop only — mobile uses a fixed overlay in the game view */}
-      <div className="hidden sm:flex justify-center w-full">
+      <div className="flex justify-center w-full">
         <GameMessage message={gs.message} />
       </div>
     </div>

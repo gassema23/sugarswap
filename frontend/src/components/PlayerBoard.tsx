@@ -106,7 +106,7 @@ export default function PlayerBoard({
   turnPhase,
   gamePhase,
   onCardClick,
-  cardSize = 68,
+  cardSize = 92,
   showLabel = true,
 }: PlayerBoardProps) {
   function isCardClickable(row: number, col: number): boolean {
@@ -124,7 +124,7 @@ export default function PlayerBoard({
 
   const score = gridScore(player);
   // −10% breathing room
-  const effectiveSize = Math.round(cardSize * 0.9);
+  const effectiveSize = Math.round(cardSize * 0.85);
 
   return (
     // Extra padding so the floating badge doesn't clip outside

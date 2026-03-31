@@ -62,7 +62,7 @@ export default function DeckDiscard({
 
   return (
     <div
-      className={`flex flex-row items-end gap-y-2 ${isMobile ? 'gap-x-3' : 'gap-x-6'} sm:gap-x-10`}
+      className={`flex flex-row items-end gap-y-2 ${isMobile ? 'gap-x-6' : 'gap-x-6'} sm:gap-x-10`}
       style={{
         padding: isMobile ? '6px 10px 8px' : '10px 16px 12px',
         borderRadius: 20,
@@ -74,7 +74,7 @@ export default function DeckDiscard({
     >
 
       {/* Draw pile */}
-      <div className="flex flex-col items-center gap-1.5">
+      <div className="flex flex-col items-center gap-6">
         {/* Label: desktop only */}
         <span
           className="hidden sm:block font-bold"
@@ -107,7 +107,7 @@ export default function DeckDiscard({
 
       {/* Drawn card (in hand) */}
       {drawnCard && (
-        <div className="flex flex-col items-center gap-1.5">
+        <div className="flex flex-col items-center gap-6">
           {/* Label: desktop only */}
           <span
             className="hidden sm:block font-bold"
@@ -148,8 +148,8 @@ export default function DeckDiscard({
                 fontWeight: 700,
                 color: 'white',
                 touchAction: 'manipulation',
-                fontSize: isMobile ? '0.65rem' : '0.875rem',
-                padding: isMobile ? '4px 10px' : '6px 14px',
+                fontSize: isMobile ? '0.8rem' : '0.875rem',
+                padding: isMobile ? '4px 22px' : '6px 14px',
                 boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
                 textShadow: '0 1px 3px rgba(0,0,0,0.4)',
               }}

@@ -39,6 +39,7 @@ export default function ModeMenu({ onSelect, onRules }: ModeMenuProps) {
           WebkitTextFillColor: 'transparent',
           backgroundClip: 'text',
           filter: 'drop-shadow(0 1px 8px rgba(255,170,0,0.55))',
+          textAlign: 'center',
         }}>
           Prêt pour une dose de sucre ?
         </h2>

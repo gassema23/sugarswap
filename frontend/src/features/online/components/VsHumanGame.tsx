@@ -9,7 +9,6 @@ import PlayerBoard from '@/components/PlayerBoard';
 import DeckDiscard from '@/components/DeckDiscard';
 import ScoreModal from '@/components/ScoreModal';
 import GameMessage from '@/components/GameMessage';
-import HelpButton from '@/components/HelpButton';
 import GameMenu from '@/components/GameMenu';
 import OnlineLobby from '@/components/OnlineLobby';
 import ProgressionToast from '@/components/ProgressionToast';
@@ -121,20 +120,11 @@ export default function VsHumanGame({
   return (
     <motion.div
       key="online-game"
-      className="w-full flex-1 flex flex-col items-center px-2 sm:px-4 py-1 sm:py-2 gap-1 sm:gap-2 relative z-10 min-h-0"
+      className="w-full flex-1 flex flex-col items-center px-2 sm:px-4 py-2 sm:py-2 relative z-10 min-h-0"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
     >
-      <GameTopBar gs={gs} />
-
-      {/* Mobile fixed message overlay */}
-      <div
-        className="visible sm:invisible flex justify-center pointer-events-none"
-        style={{ zIndex: 45, padding: '0 0 0 12px' }}
-      >
-        <GameMessage message={gs.message} compact />
-      </div>
-
+      {/* Modals & overlays — outside the layout flow */}
       <ScoreModal
         isOpen={isModalOpen}
         players={gs.players}
@@ -145,48 +135,6 @@ export default function VsHumanGame({
         onQuit={() => { playButtonClick(); disconnect(); onBackToMenu(); }}
       />
 
-      {/* All players status bar */}
-      <PlayersBar
-        players={gs.players}
-        currentPlayerIndex={gs.currentPlayerIndex}
-        gamePhase={gs.phase}
-      />
-
-      {/* Deck / Discard */}
-      <DeckDiscard
-        deckCount={gs.deck.length}
-        topDiscard={topDiscard}
-        drawnCard={gs.drawnCard}
-        canDrawDiscard={canDrawDiscard}
-        canDrawDeck={canDrawDeck}
-        canDiscardDrawn={canDiscardDrawn}
-        onDrawDiscard={() => { playDrawDiscard(); drawDiscard(); }}
-        onDrawDeck={() => { playDrawDeck(); drawDeck(); }}
-        onDiscardDrawn={() => { playDiscard(); discardCard(); }}
-        cardSize={sizes.deck}
-      />
-
-      {/* My board only — label suppressed, already shown in PlayersBar */}
-      {mePlayer && (
-        <PlayerBoard
-          player={mePlayer}
-          isActive={isHumanTurn && !isModalOpen}
-          isHuman={true}
-          turnPhase={gs.turnPhase}
-          gamePhase={gs.phase}
-          onCardClick={handleCardClick}
-          cardSize={sizes.me}
-          showLabel={false}
-        />
-      )}
-
-      <HelpButton
-        gamePhase={gs.phase}
-        turnPhase={gs.turnPhase}
-        isHumanTurn={isHumanTurn}
-        hasDrawnCard={!!gs.drawnCard}
-      />
-
       <GameMenu
         isOpen={showMenu}
         onResume={() => setShowMenu(false)}
@@ -194,6 +142,84 @@ export default function VsHumanGame({
       />
 
       <ProgressionToast update={progressionUpdate} onDismiss={clearProgressionUpdate} />
+
+      {/* Settings FAB — fixed bottom-right, never overlaps in-flow content */}
+      {!isModalOpen && (
+        <motion.button
+          className="sm:hidden"
+          onClick={() => setShowMenu(true)}
+          style={{
+            position: 'fixed',
+            bottom: 'calc(env(safe-area-inset-bottom, 0px) + 16px)',
+            right: 16,
+            zIndex: 60,
+            width: 48,
+            height: 48,
+            borderRadius: '50%',
+            background: 'rgba(10, 4, 30, 0.95)',
+            border: '3px solid rgba(255,255,255,0.9)',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+          whileHover={{ scale: 1.15 }}
+          whileTap={{ scale: 0.92 }}
+          animate={{
+            boxShadow: [
+              '0 4px 20px rgba(0,0,0,0.35), 0 0 0 0px rgba(255,215,0,0.6)',
+              '0 4px 20px rgba(0,0,0,0.35), 0 0 0 10px rgba(255,215,0,0)',
+              '0 4px 20px rgba(0,0,0,0.35), 0 0 0 0px rgba(255,215,0,0)',
+            ],
+          }}
+          transition={{ duration: 2.5, repeat: Infinity, repeatDelay: 1 }}
+        >
+          <span style={{ fontSize: '1.4rem', fontWeight: 900, color: 'white' }}>⚙</span>
+        </motion.button>
+      )}
+
+      {/* ── In-flow layout — 5 sections stacked, distributed to fill height ── */}
+      <div className="flex-1 w-full flex flex-col items-center justify-between sm:justify-start sm:gap-3 min-h-0 pb-20 sm:pb-2">
+
+        {/* 1. Numéro de la manche */}
+        <GameTopBar gs={gs} />
+
+        {/* 3. Noms des participants */}
+        <PlayersBar
+          players={gs.players}
+          currentPlayerIndex={gs.currentPlayerIndex}
+          gamePhase={gs.phase}
+        />
+
+        {/* 4. Cartes (paquet + défausse + carte en main) */}
+        <DeckDiscard
+          deckCount={gs.deck.length}
+          topDiscard={topDiscard}
+          drawnCard={gs.drawnCard}
+          canDrawDiscard={canDrawDiscard}
+          canDrawDeck={canDrawDeck}
+          canDiscardDrawn={canDiscardDrawn}
+          onDrawDiscard={() => { playDrawDiscard(); drawDiscard(); }}
+          onDrawDeck={() => { playDrawDeck(); drawDeck(); }}
+          onDiscardDrawn={() => { playDiscard(); discardCard(); }}
+          cardSize={sizes.deck}
+        />
+
+        {/* 5. Deck du joueur */}
+        {mePlayer && (
+          <PlayerBoard
+            player={mePlayer}
+            isActive={isHumanTurn && !isModalOpen}
+            isHuman={true}
+            turnPhase={gs.turnPhase}
+            gamePhase={gs.phase}
+            onCardClick={handleCardClick}
+            cardSize={sizes.me}
+            showLabel={false}
+          />
+        )}
+
+      </div>
     </motion.div>
   );
 }
