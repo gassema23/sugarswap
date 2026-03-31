@@ -428,140 +428,325 @@ export function startNewRound(state: GameState): GameState {
 //   • Its own revealed cards
 //   • The top card of the discard pile
 //   • The drawn card (when it holds one)
-// It never reads hidden card values.
+// It NEVER reads hidden card values.
+//
+// Deck statistics: 150 cards, values -2..12
+//   sum = 5×(-2) + 10×(-1) + 15×0 + 10×(1+2+…+12) = 760
+//   expected value of any unknown card ≈ 760/150 ≈ 5.07
 //
 // Difficulty profiles:
-//   easy   — hesitant, high mistake rate, no column strategy
-//   medium — balanced heuristic with small imperfection rate
-//   expert — sharp: prefers combo setups, low mistake rate, strategic swaps
+//   easy   — hesitant, high randomness, ignores strategy
+//   medium — improved heuristic using expected hidden-card value
+//   expert — full evaluation: column combos, expected-value swaps, strategic reveals
 
-interface AiProfile {
-  discardThreshold: number;  // take discard if value ≤ this AND it improves worst
-  missDiscardRate:  number;  // probability of ignoring a good discard
-  noSwapRate:       number;  // probability of not swapping even when beneficial
-  comboAware:       boolean; // look for column-combo opportunities
+const EXPECTED_UNKNOWN = 760 / 150; // ≈ 5.07
+
+/**
+ * The "effective value" of a grid cell for decision-making:
+ *   • null  (eliminated slot) → 0
+ *   • revealed card          → its actual value
+ *   • hidden card            → expected value of an unknown card
+ */
+function effectiveCardValue(card: Card | null): number {
+  if (card === null) return 0;
+  return card.isRevealed ? card.value : EXPECTED_UNKNOWN;
 }
 
-const AI_PROFILES: Record<AiDifficulty, AiProfile> = {
-  easy:   { discardThreshold: 1,  missDiscardRate: 0.50, noSwapRate: 0.40, comboAware: false },
-  medium: { discardThreshold: 3,  missDiscardRate: 0.10, noSwapRate: 0.05, comboAware: false },
-  expert: { discardThreshold: 2,  missDiscardRate: 0.02, noSwapRate: 0.02, comboAware: true  },
-};
+/**
+ * Score improvement from placing drawnValue at (row, col).
+ * Returns: removedValue − drawnValue + bonus for column combos.
+ * Higher = better for the AI (score decreases).
+ * Returns -Infinity for null (eliminated) slots.
+ */
+function evaluateSwapGain(grid: Grid, row: number, col: number, drawnValue: number): number {
+  const cell = grid[row][col];
+  if (cell === null) return -Infinity;
 
-/** For expert mode: find a column where 2 of 3 visible cards match drawnValue. */
-function findComboTarget(grid: Grid, drawnValue: number): [number, number] | null {
-  for (let col = 0; col < COLS; col++) {
-    const cells = grid.map(row => row[col]);
-    const revealed = cells.filter(c => c !== null && c.isRevealed);
-    const matchCount = revealed.filter(c => c!.value === drawnValue).length;
-    if (matchCount >= 2) {
-      // Find the non-revealed or non-matching slot to place the card
-      for (let row = 0; row < ROWS; row++) {
-        const c = cells[row];
-        if (c !== null && (!c.isRevealed || c.value !== drawnValue)) {
-          return [row, col];
-        }
-      }
-    }
+  const removedValue = effectiveCardValue(cell);
+  let gain = removedValue - drawnValue;
+
+  // Column bonus: check other cells in the same column (after the hypothetical swap)
+  const otherCells = grid.map((r, ri) => ri === row ? null : r[col]);
+  const otherRevealed = otherCells.filter(c => c !== null && c.isRevealed);
+
+  if (otherRevealed.length === 2 && otherRevealed.every(c => c!.value === drawnValue)) {
+    // Placing drawnValue here eliminates the entire column → massive bonus
+    gain += 30;
+  } else if (otherRevealed.length === 1 && otherRevealed[0]!.value === drawnValue) {
+    // Creates a 2-of-3 match in the column → good setup
+    gain += 6;
   }
-  return null;
+
+  return gain;
 }
 
-export function aiTakeTurn(state: GameState, difficulty: AiDifficulty = 'medium'): GameState {
+// ─── Easy AI ──────────────────────────────────────────────────────────────────
+
+function easyAiTurn(state: GameState): GameState {
   let s = cloneState(state);
-  const prof = AI_PROFILES[difficulty];
 
-  // ── Phase: draw ───────────────────────────────────────────────────────────
   if (s.turnPhase === 'draw') {
-    const currentPlayer = s.players[s.currentPlayerIndex];
     const topDiscard = s.discardPile[s.discardPile.length - 1];
-
-    const visibleValues = currentPlayer.grid
-      .flat()
-      .filter(c => c !== null && c.isRevealed)
-      .map(c => c!.value);
-
-    const maxVisible = visibleValues.length > 0 ? Math.max(...visibleValues) : -Infinity;
-
-    const isGoodDiscard =
+    // Only take discard if it's ≤ 0 AND we randomly decide to (50% miss rate)
+    const takeDiscard =
       topDiscard !== undefined &&
-      topDiscard.value <= prof.discardThreshold &&
-      maxVisible > topDiscard.value;
-
-    const shouldTakeDiscard = isGoodDiscard && Math.random() > prof.missDiscardRate;
-    s = shouldTakeDiscard ? drawFromDiscard(s) : drawFromDeck(s);
+      topDiscard.value <= 0 &&
+      Math.random() > 0.50;
+    s = takeDiscard ? drawFromDiscard(s) : drawFromDeck(s);
   }
 
-  // ── Phase: discard_or_swap ────────────────────────────────────────────────
   if (s.turnPhase === 'discard_or_swap' && s.drawnCard) {
-    const currentPlayer = s.players[s.currentPlayerIndex];
+    const player = s.players[s.currentPlayerIndex];
     const drawnValue = s.drawnCard.value;
 
-    // Expert: check for 2-of-3 combo opportunity first
-    if (prof.comboAware) {
-      const comboTarget = findComboTarget(currentPlayer.grid, drawnValue);
-      if (comboTarget && Math.random() > prof.noSwapRate) {
-        s = swapWithGrid(s, comboTarget[0], comboTarget[1]);
-        return s;
+    // 40% chance of making a random (possibly bad) swap
+    if (Math.random() < 0.40) {
+      const nonNull: [number, number][] = [];
+      for (let r = 0; r < ROWS; r++)
+        for (let c = 0; c < COLS; c++)
+          if (player.grid[r][c] !== null) nonNull.push([r, c]);
+      if (nonNull.length > 0) {
+        const [r, c] = nonNull[Math.floor(Math.random() * nonNull.length)];
+        return swapWithGrid(s, r, c);
       }
     }
 
-    // Find the worst VISIBLE card to potentially replace
+    // Otherwise: swap only with worst visible if clear improvement
     let worstRow = -1, worstCol = -1, worstValue = -Infinity;
     for (let r = 0; r < ROWS; r++) {
       for (let c = 0; c < COLS; c++) {
-        const card = currentPlayer.grid[r][c];
-        if (card && card.isRevealed && card.value > worstValue) {
-          worstValue = card.value;
-          worstRow = r;
-          worstCol = c;
+        const card = player.grid[r][c];
+        if (card?.isRevealed && card.value > worstValue) {
+          worstValue = card.value; worstRow = r; worstCol = c;
         }
       }
     }
-
-    const canImprove = worstRow !== -1 && drawnValue < worstValue;
-
-    if (canImprove && Math.random() > prof.noSwapRate) {
+    if (worstRow !== -1 && drawnValue < worstValue && Math.random() > 0.40) {
       s = swapWithGrid(s, worstRow, worstCol);
     } else {
       s = discardDrawnCard(s);
     }
   }
 
-  // ── Phase: reveal_hidden ──────────────────────────────────────────────────
   if (s.turnPhase === 'reveal_hidden') {
-    const currentPlayer = s.players[s.currentPlayerIndex];
-
+    const player = s.players[s.currentPlayerIndex];
     const hidden: [number, number][] = [];
-    for (let r = 0; r < ROWS; r++) {
-      for (let c = 0; c < COLS; c++) {
-        const card = currentPlayer.grid[r][c];
-        if (card && !card.isRevealed) hidden.push([r, c]);
-      }
-    }
-
+    for (let r = 0; r < ROWS; r++)
+      for (let c = 0; c < COLS; c++)
+        if (player.grid[r][c] && !player.grid[r][c]!.isRevealed) hidden.push([r, c]);
     if (hidden.length > 0) {
-      // Expert: prefer revealing in columns that already have 2 matching visible cards
-      let target: [number, number] | null = null;
-      if (prof.comboAware) {
-        for (const [r, c] of hidden) {
-          const colCells = currentPlayer.grid.map(row => row[c]);
-          const revealed = colCells.filter(card => card !== null && card.isRevealed);
-          if (revealed.length >= 2) {
-            const val = revealed[0]!.value;
-            if (revealed.every(card => card!.value === val)) {
-              target = [r, c];
-              break;
-            }
-          }
-        }
-      }
-      const [r, c] = target ?? hidden[Math.floor(Math.random() * hidden.length)];
+      const [r, c] = hidden[Math.floor(Math.random() * hidden.length)];
       s = revealHiddenCard(s, r, c);
     }
   }
 
   return s;
+}
+
+// ─── Medium AI ────────────────────────────────────────────────────────────────
+
+function mediumAiTurn(state: GameState): GameState {
+  let s = cloneState(state);
+
+  if (s.turnPhase === 'draw') {
+    const player = s.players[s.currentPlayerIndex];
+    const topDiscard = s.discardPile[s.discardPile.length - 1];
+
+    // Consider visible cards only
+    const visibleValues = player.grid.flat()
+      .filter(c => c !== null && c.isRevealed)
+      .map(c => c!.value);
+    const maxVisible = visibleValues.length > 0 ? Math.max(...visibleValues) : -Infinity;
+
+    const isGoodDiscard =
+      topDiscard !== undefined &&
+      topDiscard.value <= 4 &&
+      maxVisible > topDiscard.value;
+
+    const shouldTakeDiscard = isGoodDiscard && Math.random() > 0.10;
+    s = shouldTakeDiscard ? drawFromDiscard(s) : drawFromDeck(s);
+  }
+
+  if (s.turnPhase === 'discard_or_swap' && s.drawnCard) {
+    const player = s.players[s.currentPlayerIndex];
+    const drawnValue = s.drawnCard.value;
+
+    // Swap with worst VISIBLE card if clear improvement
+    let worstRow = -1, worstCol = -1, worstValue = -Infinity;
+    for (let r = 0; r < ROWS; r++) {
+      for (let c = 0; c < COLS; c++) {
+        const card = player.grid[r][c];
+        if (card?.isRevealed && card.value > worstValue) {
+          worstValue = card.value; worstRow = r; worstCol = c;
+        }
+      }
+    }
+
+    // Also consider replacing a hidden card if drawn is below average
+    let hiddenRow = -1, hiddenCol = -1;
+    if (drawnValue < EXPECTED_UNKNOWN) {
+      // Pick a random hidden slot (we can't know which is worst)
+      const hiddenSlots: [number, number][] = [];
+      for (let r = 0; r < ROWS; r++)
+        for (let c = 0; c < COLS; c++)
+          if (player.grid[r][c] && !player.grid[r][c]!.isRevealed) hiddenSlots.push([r, c]);
+      if (hiddenSlots.length > 0) {
+        [hiddenRow, hiddenCol] = hiddenSlots[Math.floor(Math.random() * hiddenSlots.length)];
+      }
+    }
+
+    const swapWithVisible = worstRow !== -1 && drawnValue < worstValue && Math.random() > 0.05;
+    // Swap hidden only if drawn is below average AND no visible card is a better target
+    const swapWithHidden  =
+      hiddenRow !== -1 &&
+      drawnValue < EXPECTED_UNKNOWN - 1 &&
+      (worstRow === -1 || worstValue <= drawnValue) &&
+      Math.random() > 0.05;
+
+    if (swapWithVisible) {
+      s = swapWithGrid(s, worstRow, worstCol);
+    } else if (swapWithHidden) {
+      s = swapWithGrid(s, hiddenRow, hiddenCol);
+    } else {
+      s = discardDrawnCard(s);
+    }
+  }
+
+  if (s.turnPhase === 'reveal_hidden') {
+    const player = s.players[s.currentPlayerIndex];
+    const hidden: [number, number][] = [];
+    for (let r = 0; r < ROWS; r++)
+      for (let c = 0; c < COLS; c++)
+        if (player.grid[r][c] && !player.grid[r][c]!.isRevealed) hidden.push([r, c]);
+    if (hidden.length > 0) {
+      const [r, c] = hidden[Math.floor(Math.random() * hidden.length)];
+      s = revealHiddenCard(s, r, c);
+    }
+  }
+
+  return s;
+}
+
+// ─── Expert AI ────────────────────────────────────────────────────────────────
+
+function expertAiTurn(state: GameState): GameState {
+  let s = cloneState(state);
+
+  // ── Draw phase ────────────────────────────────────────────────────────────
+  if (s.turnPhase === 'draw') {
+    const player = s.players[s.currentPlayerIndex];
+    const topDiscard = s.discardPile[s.discardPile.length - 1];
+
+    if (topDiscard) {
+      // Evaluate best swap gain if we take the discard
+      let bestDiscardGain = -Infinity;
+      for (let r = 0; r < ROWS; r++)
+        for (let c = 0; c < COLS; c++) {
+          const gain = evaluateSwapGain(player.grid, r, c, topDiscard.value);
+          if (gain > bestDiscardGain) bestDiscardGain = gain;
+        }
+
+      // How many hidden cards do we have?  More hidden → deck draw (discard + reveal) is more valuable
+      const hiddenCount = player.grid.flat().filter(c => c !== null && !c.isRevealed).length;
+
+      // Break-even: taking discard is worthwhile if the gain justifies losing the "reveal" option
+      // Deck draw gives us flexibility: either swap a good card OR discard + reveal hidden
+      // Heuristic threshold: higher when we have many hidden slots
+      const threshold = 1.5 + hiddenCount * 0.4;
+
+      s = bestDiscardGain >= threshold ? drawFromDiscard(s) : drawFromDeck(s);
+    } else {
+      s = drawFromDeck(s);
+    }
+  }
+
+  // ── Discard-or-swap phase ─────────────────────────────────────────────────
+  if (s.turnPhase === 'discard_or_swap' && s.drawnCard) {
+    const player = s.players[s.currentPlayerIndex];
+    const drawnValue = s.drawnCard.value;
+
+    // Find the best swap position across ALL grid slots (revealed + hidden)
+    let bestGain = -Infinity;
+    let bestRow = -1, bestCol = -1;
+    for (let r = 0; r < ROWS; r++) {
+      for (let c = 0; c < COLS; c++) {
+        const gain = evaluateSwapGain(player.grid, r, c, drawnValue);
+        if (gain > bestGain) { bestGain = gain; bestRow = r; bestCol = c; }
+      }
+    }
+
+    // Discard + reveal is worth approximately 1 point in expected score reduction
+    // (We reveal one hidden card ≈ 5.07 → might enable a good swap next turn)
+    const REVEAL_VALUE = 1.0;
+
+    if (bestRow !== -1 && bestGain >= REVEAL_VALUE) {
+      s = swapWithGrid(s, bestRow, bestCol);
+    } else {
+      s = discardDrawnCard(s);
+    }
+  }
+
+  // ── Reveal-hidden phase ───────────────────────────────────────────────────
+  if (s.turnPhase === 'reveal_hidden') {
+    const player = s.players[s.currentPlayerIndex];
+
+    // Priority 1: complete a column (2 matching revealed + 1 hidden in same col)
+    for (let c = 0; c < COLS; c++) {
+      const colCells = player.grid.map(row => row[c]);
+      const revealed = colCells.filter(cell => cell !== null && cell.isRevealed);
+      if (
+        revealed.length === 2 &&
+        revealed.every(cell => cell!.value === revealed[0]!.value)
+      ) {
+        for (let r = 0; r < ROWS; r++) {
+          const card = player.grid[r][c];
+          if (card && !card.isRevealed) return revealHiddenCard(s, r, c);
+        }
+      }
+    }
+
+    // Priority 2: reveal in the column with the highest effective total
+    // (exposes potential swap targets; high-value columns are worst to keep)
+    let bestColScore = -Infinity;
+    let bestTarget: [number, number] | null = null;
+    for (let c = 0; c < COLS; c++) {
+      const colCells = player.grid.map(row => row[c]);
+      const hasHidden = colCells.some(cell => cell !== null && !cell.isRevealed);
+      if (!hasHidden) continue;
+      const colScore = colCells.reduce((sum, cell) => sum + effectiveCardValue(cell), 0);
+      if (colScore > bestColScore) {
+        bestColScore = colScore;
+        for (let r = 0; r < ROWS; r++) {
+          const card = player.grid[r][c];
+          if (card && !card.isRevealed) { bestTarget = [r, c]; break; }
+        }
+      }
+    }
+
+    if (bestTarget) return revealHiddenCard(s, bestTarget[0], bestTarget[1]);
+
+    // Fallback: random hidden card
+    const hidden: [number, number][] = [];
+    for (let r = 0; r < ROWS; r++)
+      for (let c = 0; c < COLS; c++)
+        if (player.grid[r][c] && !player.grid[r][c]!.isRevealed) hidden.push([r, c]);
+    if (hidden.length > 0) {
+      const [r, c] = hidden[Math.floor(Math.random() * hidden.length)];
+      s = revealHiddenCard(s, r, c);
+    }
+  }
+
+  return s;
+}
+
+// ─── Public dispatcher ────────────────────────────────────────────────────────
+
+export function aiTakeTurn(state: GameState, difficulty: AiDifficulty = 'medium'): GameState {
+  switch (difficulty) {
+    case 'easy':   return easyAiTurn(state);
+    case 'medium': return mediumAiTurn(state);
+    case 'expert': return expertAiTurn(state);
+  }
 }
 
 // ─── Exports ──────────────────────────────────────────────────────────────────
