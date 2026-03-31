@@ -23,8 +23,10 @@ import { initGame } from '../engine/gameEngine';
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
+// Derive the WebSocket URL from the current page origin so this works in both
+// dev (Vite proxies /ws → ws://localhost:3001/ws) and production (wss://domain/ws).
 const WS_URL = (import.meta as { env: Record<string, string> }).env.VITE_WS_URL
-  ?? 'ws://localhost:3001/ws';
+  ?? `${window.location.protocol === 'https:' ? 'wss' : 'ws'}://${window.location.host}/ws`;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
