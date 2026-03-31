@@ -83,7 +83,7 @@ export default function ModeMenu({
             <line x1="4" y1="13" x2="2" y2="13" stroke="white" strokeWidth="1.8" strokeLinecap="round"/>
             <line x1="20" y1="13" x2="22" y2="13" stroke="white" strokeWidth="1.8" strokeLinecap="round"/>
           </svg>
-          Solo vs l&apos;IA sucrée 🍭
+          Solo vs 
         </button>
 
         <button

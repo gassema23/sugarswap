@@ -5,6 +5,7 @@ import type { AiDifficulty } from '../engine/types';
 import Logo from '@/components/Logo';
 import GameIcon from '@/components/GameIcon';
 import { playButtonClick } from '@/utils/sounds';
+import { AI_NAME, GUEST_NAME, PANEL_WIDTH, CARD_BACKGROUND, CARD_BORDER, CARD_BOX_SHADOW } from '@/constants';
 
 const DIFFICULTY_CONFIG: Record<AiDifficulty, { label: string; emoji: string; desc: string; gradient: string }> = {
   easy:   { label: 'Facile',  emoji: '🍬', desc: "L'IA fait des erreurs",   gradient: 'linear-gradient(135deg, #4CAF50 0%, #8BC34A 100%)' },
@@ -17,10 +18,11 @@ interface VsAiSetupProps {
   onBack: () => void;
 }
 
+const AI_NAME = 'Sirup';
+
 export default function VsAiSetup({ onStart, onBack }: VsAiSetupProps) {
   const { user: authUser } = useAuth();
   const [p1, setP1] = useState(authUser?.name ?? 'Gourmand');
-  const [p2, setP2] = useState('IA Sucrée');
   const [difficulty, setDifficulty] = useState<AiDifficulty>('medium');
 
   const inputStyle: React.CSSProperties = {
@@ -68,7 +70,7 @@ export default function VsAiSetup({ onStart, onBack }: VsAiSetupProps) {
       >
         <h2 style={{ color: '#FFD700', margin: 0, fontSize: '1.2rem', textShadow: '0 0 10px rgba(255,215,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
           <GameIcon name="robot" size={26} />
-          Solo vs l&apos;IA sucrée
+          Solo vs {AI_NAME}
         </h2>
 
         {/* Difficulty selector */}
@@ -118,14 +120,13 @@ export default function VsAiSetup({ onStart, onBack }: VsAiSetupProps) {
           <label style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.75rem' }}>Ton surnom gourmand</label>
           <input style={inputStyle} value={p1} onChange={e => setP1(e.target.value)} placeholder="Gourmand" />
         </div>
-        <div className="flex flex-col gap-2 w-full">
-          <label style={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.75rem' }}>Nom de l&apos;IA</label>
-          <input style={inputStyle} value={p2} onChange={e => setP2(e.target.value)} placeholder="IA Sucrée" />
+        <div style={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.75rem', textAlign: 'center' }}>
+          Tu joueras contre <span style={{ color: '#FFD700', fontWeight: 700 }}>{AI_NAME}</span>
         </div>
         <button
           className="btn-candy w-full mt-1"
           style={{ background: 'linear-gradient(135deg,#E91E63,#FF9800)', fontSize: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
-          onClick={() => { playButtonClick(); onStart([p1 || 'Gourmand', p2 || 'IA Sucrée'], difficulty); }}
+          onClick={() => { playButtonClick(); onStart([p1 || 'Gourmand', AI_NAME], difficulty); }}
         >
           <GameIcon name="play" size={24} />
           Jouer !
