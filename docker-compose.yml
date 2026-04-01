@@ -8,10 +8,6 @@ services:
   backend:
     image: ghcr.io/gassema23/sugarswap-backend:latest
     restart: unless-stopped
-    volumes:
-      # Modèle ONNX monté depuis le VPS — mis à jour sans rebuild d'image.
-      # Sur le VPS : mkdir -p ~/ai-models && cp ppo_sugar_swap.onnx ~/ai-models/
-      - ${AI_MODEL_DIR:-/tmp/ai-models}:/app/dist/ai/model:ro
     environment:
       PORT: 3001
       DATABASE_URL: ${DATABASE_URL}
