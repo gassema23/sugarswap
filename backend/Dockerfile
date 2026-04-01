@@ -18,8 +18,9 @@ RUN npm run build
 FROM node:22-alpine
 WORKDIR /app
 
-# Prisma query engine binary requires libssl at runtime on Alpine
-RUN apk add --no-cache openssl
+# openssl  → Prisma query engine
+# gcompat  → glibc compatibility shim for onnxruntime-node native binaries
+RUN apk add --no-cache openssl gcompat
 
 COPY package*.json ./
 RUN npm ci --omit=dev

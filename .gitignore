@@ -29,9 +29,8 @@ gameai/ppo_*.zip
 gameai/ppo_*.onnx
 gameai/ppo_*.onnx.data
 
-# ─── ONNX model in backend (copié manuellement, pas versionné) ───────────────
-backend/src/ai/model/*.onnx
-backend/src/ai/model/*.onnx.data
+# ─── ONNX model in backend : versionné dans git (< 1 MB) ─────────────────────
+# backend/src/ai/model/  ← intentionnellement pas ignoré
 
 # ─── Logs ─────────────────────────────────────────────────────────────────────
 *.log
