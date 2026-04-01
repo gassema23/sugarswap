@@ -6,7 +6,7 @@ export const APP_DOMAIN    = 'vynia.app';
 // ─── Game ─────────────────────────────────────────────────────────────────────
 
 /** Fixed name for the AI opponent — shown in setup and recorded in match history. */
-export const AI_NAME          = 'Sirup';
+export const AI_NAME          = 'Friandise';
 
 /** Default player name when the user is a guest. */
 export const GUEST_NAME       = 'Gourmand';

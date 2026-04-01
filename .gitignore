@@ -1,0 +1,50 @@
+# ─── Node ────────────────────────────────────────────────────────────────────
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ─── Build outputs ────────────────────────────────────────────────────────────
+dist/
+dist-ssr/
+build/
+
+# ─── Environment variables ────────────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+
+# ─── Python (gameai/) ─────────────────────────────────────────────────────────
+venv/
+.venv/
+__pycache__/
+*.py[cod]
+*.pyo
+.Python
+
+# ─── RL training artefacts ────────────────────────────────────────────────────
+gameai/runs/
+gameai/checkpoints/
+gameai/ppo_*.zip
+gameai/ppo_*.onnx
+gameai/ppo_*.onnx.data
+
+# ─── ONNX model in backend (copié manuellement, pas versionné) ───────────────
+backend/src/ai/model/*.onnx
+backend/src/ai/model/*.onnx.data
+
+# ─── Logs ─────────────────────────────────────────────────────────────────────
+*.log
+logs/
+
+# ─── Éditeurs ─────────────────────────────────────────────────────────────────
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+*.suo
+*.sw?
+
+# ─── Tests / couverture ───────────────────────────────────────────────────────
+coverage/
+.nyc_output/

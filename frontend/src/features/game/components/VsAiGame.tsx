@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useGame } from '../hooks/useGame';
+import { useRlAi } from '../hooks/useRlAi';
 import type { AiDifficulty } from '../engine/types';
 import { useCardSizes } from '@/shared/hooks/useCardSizes';
 import { useSoundEffects } from '@/shared/hooks/useSoundEffects';
@@ -32,8 +33,11 @@ export default function VsAiGame({ names, difficulty, onBackToMenu, token, authU
   const {
     gameState, startGame, initialReveal,
     drawDiscard, drawDeck, discardCard,
-    swapCard, revealCard, newRound, aiTurn,
+    swapCard, revealCard, newRound, aiTurn, setState,
   } = useGame();
+
+  // RL expert AI — sends obs to /api/ai/action, falls back to TS heuristic
+  const { takeTurn } = useRlAi(1, setState);
 
   useSoundEffects(gameState);
   const sizes            = useCardSizes();
@@ -120,12 +124,15 @@ export default function VsAiGame({ names, difficulty, onBackToMenu, token, authU
           const [row, col] = hidden[Math.floor(Math.random() * hidden.length)];
           initialReveal(currentPlayerIndex, row, col);
         }
+      } else if (difficulty === 'expert') {
+        // Expert: query the ONNX model via backend (falls back to TS heuristic)
+        takeTurn(gameState);
       } else {
         aiTurn(difficulty);
       }
     }, 850);
     return () => { if (aiTimerRef.current) clearTimeout(aiTimerRef.current); };
-  }, [gameState, aiTurn, initialReveal, difficulty]);
+  }, [gameState, aiTurn, takeTurn, initialReveal, difficulty]);
 
   if (!gameState) return null;
   const gs          = gameState;
