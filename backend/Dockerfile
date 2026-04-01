@@ -1,8 +1,8 @@
-FROM node:22-alpine AS builder
+FROM node:22-slim AS builder
 WORKDIR /app
 
 # Prisma schema engine requires OpenSSL at build time
-RUN apk add --no-cache openssl
+RUN apt-get update && apt-get install -y --no-install-recommends openssl && rm -rf /var/lib/apt/lists/*
 
 COPY package*.json ./
 RUN npm ci
@@ -15,12 +15,11 @@ COPY . .
 RUN npm run build
 
 # ─── Production image ─────────────────────────────────────────────────────────
-FROM node:22-alpine
+FROM node:22-slim
 WORKDIR /app
 
-# openssl  → Prisma query engine
-# gcompat  → glibc compatibility shim for onnxruntime-node native binaries
-RUN apk add --no-cache openssl gcompat
+# openssl → Prisma query engine (glibc already present in slim/Debian)
+RUN apt-get update && apt-get install -y --no-install-recommends openssl && rm -rf /var/lib/apt/lists/*
 
 COPY package*.json ./
 RUN npm ci --omit=dev
@@ -32,5 +31,4 @@ COPY prisma ./prisma
 
 EXPOSE 3001
 
-# Run pending migrations then start the server
 CMD ["sh", "-c", "npx prisma migrate deploy && node dist/main"]
