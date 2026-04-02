@@ -1,4 +1,4 @@
-vynia.app {
+sugar-swap.app {
     # WebSocket relay — path-only match, works with both HTTP/1.1 and HTTP/2 (Cloudflare)
     handle /ws {
         reverse_proxy backend:3001 {

@@ -1,7 +1,7 @@
 // ─── App identity ─────────────────────────────────────────────────────────────
 
 export const APP_NAME      = 'Sugar Swap';
-export const APP_DOMAIN    = 'vynia.app';
+export const APP_DOMAIN    = 'sugar-swap.app';
 
 // ─── Game ─────────────────────────────────────────────────────────────────────
 

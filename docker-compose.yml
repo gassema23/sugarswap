@@ -15,11 +15,11 @@ services:
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
-      GOOGLE_CALLBACK_URL: https://vynia.app/api/auth/google/callback
+      GOOGLE_CALLBACK_URL: https://sugar-swap.app/api/auth/google/callback
       FACEBOOK_APP_ID: ${FACEBOOK_APP_ID}
       FACEBOOK_APP_SECRET: ${FACEBOOK_APP_SECRET}
-      FACEBOOK_CALLBACK_URL: https://vynia.app/api/auth/facebook/callback
-      FRONTEND_URL: https://vynia.app
+      FACEBOOK_CALLBACK_URL: https://sugar-swap.app/api/auth/facebook/callback
+      FRONTEND_URL: https://sugar-swap.app
     networks:
       - app
 

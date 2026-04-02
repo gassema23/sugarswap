@@ -1,4 +1,4 @@
-vynia.app {
+sugar-swap.app {
     # WebSocket backend — must come before the catch-all
     handle /ws {
         reverse_proxy backend:3001

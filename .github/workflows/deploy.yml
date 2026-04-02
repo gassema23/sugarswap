@@ -39,7 +39,7 @@ jobs:
           push: true
           tags: ${{ env.FRONTEND_IMAGE }}:latest
           build-args: |
-            VITE_WS_URL=wss://vynia.app/ws
+            VITE_WS_URL=wss://sugar-swap.app/ws
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
